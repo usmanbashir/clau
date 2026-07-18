@@ -219,7 +219,7 @@ not found; unrecognized invocation name.
   dependency (BurntSushi/toml, MIT) is GPL-compatible.
 - goreleaser on tag push (GitHub Actions): static builds for
   linux/darwin/windows × amd64/arm64, GitHub Releases.
-- Homebrew tap from day one: goreleaser publishes the formula to
+- Homebrew tap from day one: goreleaser publishes the cask to
   `usmanbashir/homebrew-tap` (created alongside this repo; the clau
   repo's Actions get a repo-scoped token for it).
   Install: `brew install usmanbashir/tap/clau`.
