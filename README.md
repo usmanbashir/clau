@@ -1,44 +1,50 @@
 # clau
 
 [![CI](https://github.com/usmanbashir/clau/actions/workflows/ci.yml/badge.svg)](https://github.com/usmanbashir/clau/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/usmanbashir/clau)](https://github.com/usmanbashir/clau/releases)
 
-Model×effort shortcodes and launch profiles for [Claude Code](https://code.claude.com).
+Every task wants [Claude Code](https://code.claude.com) launched
+differently — Opus at max effort for the hard bug, cheap Sonnet for a
+quick question, your code-review setup for PRs. That's a long flag
+incantation or another trip through the `/model` picker, every single
+time.
 
-`co5` launches Opus at max effort. `cs1` is Sonnet on the cheap. `crev` is
-your code-review persona. One static binary, no runtime, no shell config —
-it resolves a shortcut to `claude` flags and env, execs, and disappears
-(on Windows, where exec doesn't exist, it spawns and waits instead).
+clau makes the choice the command name:
 
     co5                  # claude --model opus --effort max
+    cs1                  # sonnet on the cheap
+    crev                 # your code-review persona: model + flags + env
     c s3 "explain this"  # same grammar, argument style
-    c "fix this bug"     # unknown token? everything passes through
-    crev                 # your own profile: model + flags + env
+    c "fix this bug"     # unknown token? passes straight through
+
+<!-- demo: 20s asciinema/GIF goes here -->
 
 ## Install
 
-    brew install usmanbashir/tap/clau               # macOS and Linux
+    brew install usmanbashir/tap/clau               # macOS
     go install github.com/usmanbashir/clau@latest   # anywhere with Go
 
 Prebuilt archives for six platforms are on the
-[releases page](https://github.com/usmanbashir/clau/releases). Note that
-`go install` builds report `clau dev` — version stamping happens in
-release builds.
+[releases page](https://github.com/usmanbashir/clau/releases).
+(`go install` builds report `clau dev` — version stamping happens in
+release builds.)
 
-Then:
+## Quick start
 
     clau init            # write a starter config
     clau link            # generate shortcut commands in ~/.local/bin
-    clau list            # see every shortcut and what it launches
+    co5                  # you're in Opus at max effort
 
-`clau link` refuses to shadow real binaries (a profile named `at` will not
-silently take over `cat`) — it warns, skips, and moves on.
+If a shortcut isn't found, run `clau doctor` — it checks your config,
+PATH, collisions, and links, and says what to fix.
 
 ## The grammar
 
-`<letter><digit>`: letters come from `[models]` in your config, the digit
-1–5 maps to effort low/medium/high/xhigh/max. Letter alone = model only.
-Defaults: `o` opus, `s` sonnet, `f` fable, `h` haiku (haiku takes no
-effort digit — the CLI would silently downgrade it, so clau errors instead).
+`<letter><digit>`: the letter picks a model from `[models]` in your
+config, the digit 1–5 picks effort low/medium/high/xhigh/max. Letter
+alone = model only. Built-in letters: `o` opus, `s` sonnet, `f` fable,
+`h` haiku (haiku takes no effort digit — the CLI would silently
+downgrade it, so clau errors instead).
 
 Add a model in one line — `g = "glm-4.7"` — and `g`, `g1`…`g5`, plus
 commands `cg`, `cg1`…`cg5` all exist.
@@ -64,17 +70,31 @@ env = { ANTHROPIC_BASE_URL = "https://gateway.corp.example" }
 flags = ["--bare", "--strict-mcp-config"]
 ```
 
-Your own flags always win: `crev --model sonnet` runs the rev profile on
-Sonnet. `c -- anything` skips resolution entirely.
+Your own flags always win: `crev --model sonnet` runs the rev profile
+on Sonnet. `c -- anything` skips resolution entirely.
+
+## Why not shell aliases?
+
+clau began as fish functions in the author's dotfiles, generalized so
+the same idea works without fish — or any shell config at all:
+
+- One static binary and one TOML file, identical in fish, zsh, bash,
+  and on Windows. No dotfiles to sync.
+- Linked shortcuts are real commands, so editors, scripts, and anything
+  else that execs can use them — not just your interactive shell.
+- Profiles bundle model, effort, flags, *and* env as data, not shell
+  syntax.
+- Tab completion in fish, zsh, and bash.
+- Collision protection: a profile named `at` will not silently shadow
+  `cat` — `clau link` warns, skips, and moves on.
 
 ## Config
 
 `$CLAU_CONFIG` or `${XDG_CONFIG_HOME:-~/.config}/clau/config.toml`.
-Missing file = defaults.
-Your `[models]` entries merge over the defaults. See `clau init`'s output
-for the full commented reference.
+Missing file = defaults. Your `[models]` entries merge over the
+defaults. `clau init` writes a fully commented reference config.
 
-## Management
+## Commands
 
     clau link [--dir DIR] [--force]   sync shortcut commands (symlinks; .cmd shims on Windows)
     clau unlink [--dir DIR]           remove everything clau created
@@ -84,10 +104,16 @@ for the full commented reference.
     clau completions fish|zsh|bash    tab completion
 
 For fish, persist completions with
-`clau completions fish > ~/.config/fish/conf.d/clau.fish` — `conf.d`, not
-`completions/`, because the file registers completions for both `clau`
-and `c`, and the `completions/` autoloader only loads a file for the
-command matching its filename.
+`clau completions fish > ~/.config/fish/conf.d/clau.fish` (`conf.d`,
+not `completions/` — the file registers both `clau` and `c`).
+
+## How it works
+
+clau is strictly a launcher. It reads argv[0] to know which shortcut
+you called, resolves it against your config, sets flags and env, and
+execs claude — no wrapper process, no runtime, no telemetry, nothing
+between you and your session. (On Windows, where exec doesn't exist,
+it spawns and waits instead.)
 
 ## License
 
