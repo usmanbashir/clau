@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -13,6 +14,35 @@ func TestTokensOf(t *testing.T) {
 	want := "f f1 f2 f3 f4 f5 h o o1 o2 o3 o4 o5 rev s s1 s2 s3 s4 s5"
 	if got != want {
 		t.Errorf("tokens = %q\nwant     %q", got, want)
+	}
+}
+
+func TestTokensOfDedupesShadowingProfile(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Profiles["o5"] = Profile{Model: "shadow"}
+	count := 0
+	for _, tok := range tokensOf(cfg) {
+		if tok == "o5" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("o5 appears %d times, want 1", count)
+	}
+}
+
+func TestDoctorShadowWarningsSorted(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Profiles["s3"] = Profile{Model: "x"}
+	cfg.Profiles["o5"] = Profile{Model: "y"}
+	var shadows []string
+	for _, f := range doctorFindings(cfg, nil, t.TempDir(), "/nonexistent/clau", runtime.GOOS) {
+		if f.Level == "warn" && strings.Contains(f.Msg, "shadows grammar token") {
+			shadows = append(shadows, f.Msg)
+		}
+	}
+	if len(shadows) != 2 || !strings.Contains(shadows[0], `"o5"`) || !strings.Contains(shadows[1], `"s3"`) {
+		t.Errorf("shadow warnings not sorted: %v", shadows)
 	}
 }
 

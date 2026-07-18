@@ -27,8 +27,14 @@ func tokensOf(cfg Config) []string {
 			}
 		}
 	}
+	seen := make(map[string]bool, len(tokens))
+	for _, tok := range tokens {
+		seen[tok] = true
+	}
 	for name := range cfg.Profiles {
-		tokens = append(tokens, name)
+		if !seen[name] { // a profile shadowing a grammar token is one shortcut, not two
+			tokens = append(tokens, name)
+		}
 	}
 	sort.Strings(tokens)
 	return tokens
@@ -179,7 +185,12 @@ func doctorFindings(cfg Config, cfgErr error, dir, clauPath, goos string) []find
 	} else {
 		fs = append(fs, finding{"ok", fmt.Sprintf("link dir %s is on PATH", dir)})
 	}
+	profiles := make([]string, 0, len(cfg.Profiles))
 	for name := range cfg.Profiles {
+		profiles = append(profiles, name)
+	}
+	sort.Strings(profiles)
+	for _, name := range profiles {
 		if _, found, _ := resolveToken(Config{Models: cfg.Models, Efforts: cfg.Efforts}, name); found {
 			fs = append(fs, finding{"warn", fmt.Sprintf("profile %q shadows grammar token %q", name, name)})
 		}
