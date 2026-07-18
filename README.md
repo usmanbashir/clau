@@ -1,10 +1,13 @@
 # clau
 
+[![CI](https://github.com/usmanbashir/clau/actions/workflows/ci.yml/badge.svg)](https://github.com/usmanbashir/clau/actions/workflows/ci.yml)
+
 Model×effort shortcodes and launch profiles for [Claude Code](https://code.claude.com).
 
 `co5` launches Opus at max effort. `cs1` is Sonnet on the cheap. `crev` is
 your code-review persona. One static binary, no runtime, no shell config —
-it resolves a shortcut to `claude` flags and env, execs, and disappears.
+it resolves a shortcut to `claude` flags and env, execs, and disappears
+(on Windows, where exec doesn't exist, it spawns and waits instead).
 
     co5                  # claude --model opus --effort max
     c s3 "explain this"  # same grammar, argument style
@@ -13,8 +16,13 @@ it resolves a shortcut to `claude` flags and env, execs, and disappears.
 
 ## Install
 
-    brew install usmanbashir/tap/clau      # macOS; on Linux: go install, or a release tarball
-    go install github.com/usmanbashir/clau@latest
+    brew install usmanbashir/tap/clau               # macOS and Linux
+    go install github.com/usmanbashir/clau@latest   # anywhere with Go
+
+Prebuilt archives for six platforms are on the
+[releases page](https://github.com/usmanbashir/clau/releases). Note that
+`go install` builds report `clau dev` — version stamping happens in
+release builds.
 
 Then:
 
@@ -61,18 +69,25 @@ Sonnet. `c -- anything` skips resolution entirely.
 
 ## Config
 
-`$CLAU_CONFIG` or `~/.config/clau/config.toml`. Missing file = defaults.
+`$CLAU_CONFIG` or `${XDG_CONFIG_HOME:-~/.config}/clau/config.toml`.
+Missing file = defaults.
 Your `[models]` entries merge over the defaults. See `clau init`'s output
 for the full commented reference.
 
 ## Management
 
     clau link [--dir DIR] [--force]   sync shortcut commands (symlinks; .cmd shims on Windows)
-    clau unlink                       remove everything clau created
-    clau list [--tokens]              every token → what it launches
+    clau unlink [--dir DIR]           remove everything clau created
+    clau list [--tokens] [--dir DIR]  every token → what it launches
     clau run <token> [args...]        explicit launcher (errors on unknown token)
-    clau doctor                       config, PATH, collisions, stale links
+    clau doctor [--dir DIR]           config, PATH, collisions, stale links
     clau completions fish|zsh|bash    tab completion
+
+For fish, persist completions with
+`clau completions fish > ~/.config/fish/conf.d/clau.fish` — `conf.d`, not
+`completions/`, because the file registers completions for both `clau`
+and `c`, and the `completions/` autoloader only loads a file for the
+command matching its filename.
 
 ## License
 
