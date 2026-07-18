@@ -199,10 +199,18 @@ func cmdUnlink(args []string) {
 	fmt.Printf("removed %d clau-owned commands from %s\n", len(removed), *dir)
 }
 
-// Stub implemented in a later task.
-func cmdCompletions(args []string) { fatal("completions: not implemented yet") }
-func cmdVersion()                  { fmt.Println("clau " + version) }
-func cmdHelp()                     { fmt.Print(helpText) }
+func cmdCompletions(args []string) {
+	if len(args) != 1 {
+		fatal("usage: clau completions fish|zsh|bash")
+	}
+	s, err := completionScript(args[0])
+	if err != nil {
+		fatal("%v", err)
+	}
+	fmt.Print(s)
+}
+func cmdVersion() { fmt.Println("clau " + version) }
+func cmdHelp()    { fmt.Print(helpText) }
 
 const helpText = `clau — model×effort shortcodes and launch profiles for Claude Code
 
