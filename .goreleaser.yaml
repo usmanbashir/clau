@@ -27,6 +27,6 @@ homebrew_casks:
     hooks:
       post:
         install: |
-          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/clau"]
+          if File.executable?("/usr/bin/xattr")
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/clau"], must_succeed: false
           end
