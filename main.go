@@ -228,7 +228,7 @@ func cmdVersion() {
 	fmt.Println("Copyright (C) 2026 Usman Bashir. License GPL-3.0-or-later.")
 	fmt.Println("https://github.com/usmanbashir/clau")
 }
-func cmdHelp()    { fmt.Print(helpText) }
+func cmdHelp() { fmt.Print(helpText) }
 
 const helpText = `clau — model×effort shortcodes and launch profiles for Claude Code
 
