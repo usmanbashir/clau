@@ -183,7 +183,7 @@ func syncLinks(cfg Config, dir, clauPath, goos string, force bool) (linkReport, 
 	for _, e := range entries {
 		name := strings.TrimSuffix(e.Name(), ".cmd")
 		path := filepath.Join(dir, e.Name())
-		if desired[name] || !isOwned(path, clauPath) {
+		if desired[name] || name == "clau" || !isOwned(path, clauPath) {
 			continue
 		}
 		if err := os.Remove(path); err != nil {
@@ -205,6 +205,9 @@ func removeOwned(dir, clauPath string) ([]string, error) {
 	}
 	var removed []string
 	for _, e := range entries {
+		if strings.TrimSuffix(e.Name(), ".cmd") == "clau" {
+			continue
+		}
 		path := filepath.Join(dir, e.Name())
 		if !isOwned(path, clauPath) {
 			continue

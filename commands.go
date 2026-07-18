@@ -186,11 +186,15 @@ func doctorFindings(cfg Config, cfgErr error, dir, clauPath string) []finding {
 	}
 	if entries, err := os.ReadDir(dir); err == nil {
 		for _, e := range entries {
+			name := strings.TrimSuffix(e.Name(), ".cmd")
+			if name == "clau" {
+				continue
+			}
 			path := filepath.Join(dir, e.Name())
 			if !isOwned(path, clauPath) {
 				continue
 			}
-			token := strings.TrimPrefix(strings.TrimSuffix(e.Name(), ".cmd"), "c")
+			token := strings.TrimPrefix(name, "c")
 			if token == "" {
 				continue
 			}

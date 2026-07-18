@@ -249,3 +249,58 @@ func TestIsOwnedBasenameFallbackOnlyWhenDangling(t *testing.T) {
 		t.Error("relative dangling clau-named target must be owned")
 	}
 }
+
+// TestClauNamedEntryIsNeverTouched guards against a real hazard: a user's
+// own hand-made `~/.local/bin/clau -> <clau binary>` symlink is exact-path
+// "owned" by isOwned's definition, so without a guard syncLinks would prune
+// it, removeOwned would delete it, and doctor would misparse its "token" as
+// the name with a leading "c" stripped ("lau") and warn about a stale link.
+// An entry literally named clau (or clau.cmd) must be left alone by all
+// three.
+func TestClauNamedEntryIsNeverTouched(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink test")
+	}
+	clauPath := fakeClauBinary(t)
+	dir := t.TempDir()
+	t.Setenv("PATH", dir)
+	clauLink := filepath.Join(dir, "clau")
+	if err := os.Symlink(clauPath, clauLink); err != nil {
+		t.Fatal(err)
+	}
+
+	rep, err := syncLinks(defaultConfig(), dir, clauPath, runtime.GOOS, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, group := range [][]string{rep.Created, rep.Kept, rep.Skipped, rep.Pruned} {
+		for _, name := range group {
+			if name == "clau" {
+				t.Errorf("syncLinks touched clau: %+v", rep)
+			}
+		}
+	}
+	if target, err := os.Readlink(clauLink); err != nil || target != clauPath {
+		t.Fatalf("clau symlink disturbed by syncLinks: target=%q err=%v", target, err)
+	}
+
+	removed, err := removeOwned(dir, clauPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range removed {
+		if name == "clau" {
+			t.Errorf("removeOwned removed clau: %v", removed)
+		}
+	}
+	if target, err := os.Readlink(clauLink); err != nil || target != clauPath {
+		t.Fatalf("clau symlink removed by removeOwned: target=%q err=%v", target, err)
+	}
+
+	fs := doctorFindings(defaultConfig(), nil, dir, clauPath)
+	for _, f := range fs {
+		if strings.Contains(f.Msg, "stale link clau") {
+			t.Errorf("doctor flagged clau as a stale link: %s", f.Msg)
+		}
+	}
+}
