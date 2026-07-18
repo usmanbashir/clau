@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,41 +10,56 @@ import (
 	"testing"
 )
 
-func buildClau(t *testing.T) string {
-	t.Helper()
-	bin := filepath.Join(t.TempDir(), "clau")
-	if runtime.GOOS == "windows" {
-		bin += ".exe"
-	}
-	out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput()
-	if err != nil {
-		t.Fatalf("build: %v\n%s", err, out)
-	}
-	return bin
+// clauBin and fakeClaudeDir are built once in TestMain and shared read-only
+// across every test in this file, instead of each test shelling out to `go
+// build` for its own private copy.
+var (
+	clauBin       string
+	fakeClaudeDir string
+)
+
+func TestMain(m *testing.M) {
+	os.Exit(runIntegrationTests(m))
 }
 
-// writeFakeClaude installs a fake `claude` in dir that records its argv and
-// selected env vars into $CLAU_TEST_OUT, one line each.
-func writeFakeClaude(t *testing.T, dir string) {
-	t.Helper()
+// runIntegrationTests builds clau and the fake `claude` (see
+// testdata/fakeclaude) once into a shared temp dir, then runs the test
+// suite. It's a separate function from TestMain so the `defer
+// os.RemoveAll` actually runs: os.Exit skips deferred calls, so TestMain
+// itself must not defer anything.
+func runIntegrationTests(m *testing.M) int {
+	dir, err := os.MkdirTemp("", "clau-integration")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer os.RemoveAll(dir)
+
+	clauBin = filepath.Join(dir, "clau")
+	fakeClaudeName := "claude"
 	if runtime.GOOS == "windows" {
-		script := "@echo off\r\n(echo ARGV %*) > \"%CLAU_TEST_OUT%\"\r\n"
-		if err := os.WriteFile(filepath.Join(dir, "claude.cmd"), []byte(script), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		return
+		clauBin += ".exe"
+		fakeClaudeName = "claude.exe"
 	}
-	script := `#!/bin/sh
-{
-  printf 'ARGV'
-  for a in "$@"; do printf '\t%s' "$a"; done
-  printf '\n'
-  printf 'ENV\tANTHROPIC_BASE_URL=%s\n' "$ANTHROPIC_BASE_URL"
-} > "$CLAU_TEST_OUT"
-`
-	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	fakeClaudeDir = dir
+
+	if out, err := exec.Command("go", "build", "-o", clauBin, ".").CombinedOutput(); err != nil {
+		fmt.Fprintf(os.Stderr, "build clau: %v\n%s", err, out)
+		return 1
 	}
+	if out, err := exec.Command("go", "build", "-o", filepath.Join(fakeClaudeDir, fakeClaudeName), "./testdata/fakeclaude").CombinedOutput(); err != nil {
+		fmt.Fprintf(os.Stderr, "build fake claude: %v\n%s", err, out)
+		return 1
+	}
+
+	return m.Run()
+}
+
+// buildClau returns the path to the clau binary built once in TestMain.
+// It keeps the `bin := buildClau(t)` call sites in every test below intact.
+func buildClau(t *testing.T) string {
+	t.Helper()
+	return clauBin
 }
 
 type recorded struct {
@@ -54,7 +70,6 @@ type recorded struct {
 func runShortcut(t *testing.T, bin, invokeAs, configTOML string, args ...string) recorded {
 	t.Helper()
 	dir := t.TempDir()
-	writeFakeClaude(t, dir)
 	outFile := filepath.Join(dir, "out.txt")
 	cfgFile := filepath.Join(dir, "config.toml")
 	if err := os.WriteFile(cfgFile, []byte(configTOML), 0o644); err != nil {
@@ -72,7 +87,9 @@ func runShortcut(t *testing.T, bin, invokeAs, configTOML string, args ...string)
 	}
 	cmd := exec.Command(target, args...)
 	cmd.Env = append(os.Environ(),
-		"PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		// The fake claude lives in the shared dir built once by TestMain,
+		// not in this test's own per-run dir.
+		"PATH="+fakeClaudeDir+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"CLAU_TEST_OUT="+outFile,
 		"CLAU_CONFIG="+cfgFile,
 	)
