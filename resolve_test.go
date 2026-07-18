@@ -89,3 +89,73 @@ func TestResolveTokenCustomLadder(t *testing.T) {
 		t.Errorf("flags = %v, want %v", res.Flags, want)
 	}
 }
+
+func TestOverlayEnv(t *testing.T) {
+	base := []string{"HOME=/home/u", "ANTHROPIC_BASE_URL=old", "PATH=/bin"}
+	got := overlayEnv(base, map[string]string{
+		"ANTHROPIC_BASE_URL": "https://x",
+		"NEW_VAR":            "1",
+	})
+	want := map[string]bool{
+		"HOME=/home/u": true, "ANTHROPIC_BASE_URL=https://x": true,
+		"PATH=/bin": true, "NEW_VAR=1": true,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %v", got)
+	}
+	for _, kv := range got {
+		if !want[kv] {
+			t.Errorf("unexpected entry %q in %v", kv, got)
+		}
+	}
+}
+
+func TestOverlayEnvNilOverlayReturnsBase(t *testing.T) {
+	base := []string{"A=1"}
+	if got := overlayEnv(base, nil); !reflect.DeepEqual(got, base) {
+		t.Errorf("got %v", got)
+	}
+}
+
+func TestBuildLaunch(t *testing.T) {
+	cfg := testConfig()
+	res, _, _ := resolveToken(cfg, "s3")
+	l := buildLaunch(cfg, res, []string{"hello", "-c"})
+	if l.Target != "claude" {
+		t.Errorf("target = %q", l.Target)
+	}
+	want := []string{"--model", "sonnet", "--effort", "high", "hello", "-c"}
+	if !reflect.DeepEqual(l.Args, want) {
+		t.Errorf("args = %v, want %v", l.Args, want)
+	}
+}
+
+func TestBuildLaunchTargetPrecedence(t *testing.T) {
+	cfg := testConfig()
+	cfg.Claude = "ccr"
+	if l := buildLaunch(cfg, TokenResolution{}, nil); l.Target != "ccr" {
+		t.Errorf("global target = %q, want ccr", l.Target)
+	}
+	res, _, _ := resolveToken(cfg, "work")
+	if l := buildLaunch(cfg, res, nil); l.Target != "claude-alt" {
+		t.Errorf("profile target = %q, want claude-alt", l.Target)
+	}
+}
+
+func TestBuildLaunchAppliesProfileEnv(t *testing.T) {
+	t.Setenv("ANTHROPIC_BASE_URL", "old")
+	res, _, _ := resolveToken(testConfig(), "work")
+	l := buildLaunch(testConfig(), res, nil)
+	found := false
+	for _, kv := range l.Env {
+		if kv == "ANTHROPIC_BASE_URL=https://x" {
+			found = true
+		}
+		if kv == "ANTHROPIC_BASE_URL=old" {
+			t.Error("stale env entry survived overlay")
+		}
+	}
+	if !found {
+		t.Errorf("overlay missing from %d env entries", len(l.Env))
+	}
+}

@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"strings"
+)
 
 type TokenResolution struct {
 	Flags  []string
@@ -44,4 +48,44 @@ func resolveToken(cfg Config, token string) (TokenResolution, bool, error) {
 		return TokenResolution{Flags: []string{"--model", spec.Model}}, true, nil
 	}
 	return TokenResolution{}, false, nil
+}
+
+type Launch struct {
+	Target string
+	Args   []string
+	Env    []string
+}
+
+func overlayEnv(base []string, overlay map[string]string) []string {
+	if len(overlay) == 0 {
+		return base
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, kv := range base {
+		key, _, _ := strings.Cut(kv, "=")
+		if v, ok := overlay[key]; ok {
+			if !seen[key] {
+				out = append(out, key+"="+v)
+				seen[key] = true
+			}
+			continue
+		}
+		out = append(out, kv)
+	}
+	for key, v := range overlay {
+		if !seen[key] {
+			out = append(out, key+"="+v)
+		}
+	}
+	return out
+}
+
+func buildLaunch(cfg Config, res TokenResolution, extra []string) Launch {
+	target := cfg.Claude
+	if res.Claude != "" {
+		target = res.Claude
+	}
+	args := append(append([]string{}, res.Flags...), extra...)
+	return Launch{Target: target, Args: args, Env: overlayEnv(os.Environ(), res.Env)}
 }
