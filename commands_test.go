@@ -41,7 +41,7 @@ func TestDoctorFindings(t *testing.T) {
 	cfg.Profiles["o5"] = Profile{Model: "shadow"}
 	dir := t.TempDir()
 	t.Setenv("PATH", dir)
-	fs := doctorFindings(cfg, nil, dir, "/nonexistent/clau")
+	fs := doctorFindings(cfg, nil, dir, "/nonexistent/clau", "linux")
 	var fails, warns int
 	var text strings.Builder
 	for _, f := range fs {
@@ -63,7 +63,7 @@ func TestDoctorFindings(t *testing.T) {
 }
 
 func TestDoctorConfigError(t *testing.T) {
-	fs := doctorFindings(Config{}, errors.New("boom at line 3"), t.TempDir(), "/x/clau")
+	fs := doctorFindings(Config{}, errors.New("boom at line 3"), t.TempDir(), "/x/clau", "linux")
 	if len(fs) != 1 || fs[0].Level != "fail" || !strings.Contains(fs[0].Msg, "boom") {
 		t.Errorf("findings = %+v", fs)
 	}

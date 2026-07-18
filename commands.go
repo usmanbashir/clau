@@ -157,7 +157,7 @@ type finding struct {
 	Msg   string
 }
 
-func doctorFindings(cfg Config, cfgErr error, dir, clauPath string) []finding {
+func doctorFindings(cfg Config, cfgErr error, dir, clauPath, goos string) []finding {
 	if cfgErr != nil {
 		return []finding{{"fail", fmt.Sprintf("config: %v", cfgErr)}}
 	}
@@ -204,7 +204,7 @@ func doctorFindings(cfg Config, cfgErr error, dir, clauPath string) []finding {
 		}
 	}
 	for _, name := range linkNames(cfg) {
-		if foreign := foreignInPath(name, dir, clauPath); foreign != "" {
+		if foreign := foreignInPath(name, dir, clauPath, goos); foreign != "" {
 			fs = append(fs, finding{"warn", fmt.Sprintf("command %s would collide with %s", name, foreign)})
 		}
 	}
@@ -221,7 +221,7 @@ func cmdDoctor(args []string) {
 		clauPath = ""
 	}
 	failed := false
-	for _, f := range doctorFindings(cfg, cfgErr, *dir, clauPath) {
+	for _, f := range doctorFindings(cfg, cfgErr, *dir, clauPath, runtime.GOOS) {
 		fmt.Printf("%-4s %s\n", strings.ToUpper(f.Level), f.Msg)
 		if f.Level == "fail" {
 			failed = true

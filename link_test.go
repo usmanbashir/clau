@@ -297,10 +297,87 @@ func TestClauNamedEntryIsNeverTouched(t *testing.T) {
 		t.Fatalf("clau symlink removed by removeOwned: target=%q err=%v", target, err)
 	}
 
-	fs := doctorFindings(defaultConfig(), nil, dir, clauPath)
+	fs := doctorFindings(defaultConfig(), nil, dir, clauPath, runtime.GOOS)
 	for _, f := range fs {
 		if strings.Contains(f.Msg, "stale link clau") {
 			t.Errorf("doctor flagged clau as a stale link: %s", f.Msg)
 		}
+	}
+}
+
+// TestForeignInPathWindowsDetectsWithoutExecBit covers the Windows branch
+// of foreignInPath: a .cmd file has no meaningful exec permission bit on
+// Windows, so detection must rely purely on the file existing under a
+// recognized executable extension. On any other goos, that same file must
+// not be found at all: no extension search happens there.
+func TestForeignInPathWindowsDetectsWithoutExecBit(t *testing.T) {
+	clauPath := fakeClauBinary(t)
+	linkDir := t.TempDir()
+	pathDir := t.TempDir()
+	t.Setenv("PATH", pathDir)
+	t.Setenv("PATHEXT", "") // force the built-in default extension list
+
+	cmdFile := filepath.Join(pathDir, "foo.cmd")
+	if err := os.WriteFile(cmdFile, []byte("@echo off\r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := foreignInPath("foo", linkDir, clauPath, "windows"); got != cmdFile {
+		t.Errorf("windows: foreignInPath(%q) = %q, want %q", "foo", got, cmdFile)
+	}
+	if got := foreignInPath("foo", linkDir, clauPath, "linux"); got != "" {
+		t.Errorf("linux: foreignInPath(%q) = %q, want \"\" (no extension search, no exec bit)", "foo", got)
+	}
+}
+
+// TestForeignInPathHonorsPathext checks that the Windows candidate
+// extension list comes from $PATHEXT when it's set, instead of always
+// falling back to the .com/.exe/.bat/.cmd default.
+func TestForeignInPathHonorsPathext(t *testing.T) {
+	clauPath := fakeClauBinary(t)
+	linkDir := t.TempDir()
+	pathDir := t.TempDir()
+	t.Setenv("PATH", pathDir)
+	t.Setenv("PATHEXT", ".XYZ")
+
+	custom := filepath.Join(pathDir, "foo.xyz")
+	if err := os.WriteFile(custom, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Not in PATHEXT, so it must be ignored even though it would match
+	// the built-in default list.
+	if err := os.WriteFile(filepath.Join(pathDir, "foo.cmd"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := foreignInPath("foo", linkDir, clauPath, "windows"); got != custom {
+		t.Errorf("foreignInPath = %q, want %q (PATHEXT-driven extension list)", got, custom)
+	}
+}
+
+// TestForeignInPathWindowsBareNameNeedsExecExtension checks the bare-name
+// fallback: an extensionless file is never a candidate on Windows, but if
+// the queried name already carries a recognized executable extension, the
+// unmodified name itself is also tried (not just name+ext).
+func TestForeignInPathWindowsBareNameNeedsExecExtension(t *testing.T) {
+	clauPath := fakeClauBinary(t)
+	linkDir := t.TempDir()
+	pathDir := t.TempDir()
+	t.Setenv("PATH", pathDir)
+	t.Setenv("PATHEXT", "")
+
+	if err := os.WriteFile(filepath.Join(pathDir, "co5"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := foreignInPath("co5", linkDir, clauPath, "windows"); got != "" {
+		t.Errorf("windows: extensionless file must not be a candidate for a bare token: got %q", got)
+	}
+
+	preExtd := filepath.Join(pathDir, "tool.exe")
+	if err := os.WriteFile(preExtd, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := foreignInPath("tool.exe", linkDir, clauPath, "windows"); got != preExtd {
+		t.Errorf("windows: foreignInPath(%q) = %q, want %q", "tool.exe", got, preExtd)
 	}
 }

@@ -91,21 +91,78 @@ func isOwned(path, clauPath string) bool {
 	return false
 }
 
+// defaultWindowsExecExts is used when $PATHEXT is unset or empty.
+var defaultWindowsExecExts = []string{".com", ".exe", ".bat", ".cmd"}
+
+// windowsExecExts returns the candidate executable extensions for Windows,
+// lowercased: $PATHEXT split on ";" if set and non-empty, else the
+// built-in default list.
+func windowsExecExts() []string {
+	if v := os.Getenv("PATHEXT"); v != "" {
+		var exts []string
+		for _, e := range strings.Split(v, ";") {
+			if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
+				exts = append(exts, e)
+			}
+		}
+		if len(exts) > 0 {
+			return exts
+		}
+	}
+	return defaultWindowsExecExts
+}
+
+func hasExecExt(name string, exts []string) bool {
+	lower := strings.ToLower(name)
+	for _, ext := range exts {
+		if strings.HasSuffix(lower, ext) {
+			return true
+		}
+	}
+	return false
+}
+
+// candidateNames returns the filenames foreignInPath should stat for a
+// given token name, in order. On Windows that's name+ext for every
+// candidate extension, plus the bare name itself if it already ends in one
+// of those extensions (so a caller asking about "tool.exe" doesn't only
+// get "tool.exe.exe" checked). On every other goos it's just name, matched
+// via the exec permission bit rather than an extension.
+func candidateNames(name, goos string) []string {
+	if goos != "windows" {
+		return []string{name}
+	}
+	exts := windowsExecExts()
+	names := make([]string, 0, len(exts)+1)
+	for _, ext := range exts {
+		names = append(names, name+ext)
+	}
+	if hasExecExt(name, exts) {
+		names = append(names, name)
+	}
+	return names
+}
+
 // foreignInPath returns the path of an executable `name` reachable via PATH
 // that clau does not own, or "" if none. linkDir itself is excluded.
-func foreignInPath(name, linkDir, clauPath string) string {
-	exts := []string{""}
-	if strings.Contains(strings.ToLower(os.Getenv("PATHEXT")), ".cmd") {
-		exts = []string{"", ".exe", ".cmd"}
-	}
+//
+// goos selects how "executable" is decided: on Windows, regular files have
+// no meaningful permission bits, so a candidate counts if it exists under
+// one of the recognized executable extensions; elsewhere, the file must
+// exist (extensionless) and carry an exec permission bit.
+func foreignInPath(name, linkDir, clauPath, goos string) string {
+	names := candidateNames(name, goos)
 	for _, d := range filepath.SplitList(os.Getenv("PATH")) {
 		if d == "" || filepath.Clean(d) == filepath.Clean(linkDir) {
 			continue
 		}
-		for _, ext := range exts {
-			p := filepath.Join(d, name+ext)
+		for _, n := range names {
+			p := filepath.Join(d, n)
 			fi, err := os.Stat(p)
-			if err != nil || fi.IsDir() || fi.Mode()&0o111 == 0 {
+			if err != nil || fi.IsDir() {
+				continue
+			}
+			if goos != "windows" && fi.Mode()&0o111 == 0 {
 				continue
 			}
 			if isOwned(p, clauPath) {
@@ -147,7 +204,7 @@ func syncLinks(cfg Config, dir, clauPath, goos string, force bool) (linkReport, 
 	for _, name := range linkNames(cfg) {
 		desired[name] = true
 		path := filepath.Join(dir, linkFileName(name, goos))
-		if foreign := foreignInPath(name, dir, clauPath); foreign != "" && !force {
+		if foreign := foreignInPath(name, dir, clauPath, goos); foreign != "" && !force {
 			rep.Skipped = append(rep.Skipped, fmt.Sprintf("%s (collides with %s)", name, foreign))
 			continue
 		}
