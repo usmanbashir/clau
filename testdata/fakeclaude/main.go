@@ -6,7 +6,7 @@
 //
 // Wire format, one line each:
 //
-//	ARGV\t<arg0>\t<arg1>\t...
+//	ARGV\t<arg0>\t<arg1>\t...    (bare "ARGV" when launched with no args)
 //	ENV\tANTHROPIC_BASE_URL=<value>
 package main
 
@@ -17,8 +17,11 @@ import (
 
 func main() {
 	var b strings.Builder
-	b.WriteString("ARGV\t")
-	b.WriteString(strings.Join(os.Args[1:], "\t"))
+	b.WriteString("ARGV")
+	if len(os.Args) > 1 {
+		b.WriteString("\t")
+		b.WriteString(strings.Join(os.Args[1:], "\t"))
+	}
 	b.WriteString("\n")
 	b.WriteString("ENV\tANTHROPIC_BASE_URL=")
 	b.WriteString(os.Getenv("ANTHROPIC_BASE_URL"))

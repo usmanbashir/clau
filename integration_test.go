@@ -175,6 +175,9 @@ func TestIntegrationProfileEnv(t *testing.T) {
 	if rec.env["ANTHROPIC_BASE_URL"] != "https://gw.example" {
 		t.Errorf("env = %v", rec.env)
 	}
+	if len(rec.argv) != 0 {
+		t.Errorf("zero-arg launch recorded argv %q, want none", rec.argv)
+	}
 }
 
 func TestIntegrationStaleNameErrors(t *testing.T) {
