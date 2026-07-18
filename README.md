@@ -13,7 +13,7 @@ it resolves a shortcut to `claude` flags and env, execs, and disappears.
 
 ## Install
 
-    brew install usmanbashir/tap/clau      # or:
+    brew install usmanbashir/tap/clau      # macOS; on Linux: go install, or a release tarball
     go install github.com/usmanbashir/clau@latest
 
 Then:
