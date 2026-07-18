@@ -199,10 +199,7 @@ func cmdUnlink(args []string) {
 	fmt.Printf("removed %d clau-owned commands from %s\n", len(removed), *dir)
 }
 
-// Stubs implemented in later tasks.
-func cmdList(args []string)        { fatal("list: not implemented yet") }
-func cmdInit(args []string)        { fatal("init: not implemented yet") }
-func cmdDoctor(args []string)      { fatal("doctor: not implemented yet") }
+// Stub implemented in a later task.
 func cmdCompletions(args []string) { fatal("completions: not implemented yet") }
 func cmdVersion()                  { fmt.Println("clau " + version) }
 func cmdHelp()                     { fmt.Print(helpText) }
