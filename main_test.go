@@ -5,6 +5,21 @@ import (
 	"testing"
 )
 
+func TestVersionString(t *testing.T) {
+	old := version
+	defer func() { version = old }()
+	version = "1.2.3"
+	if got := versionString(); got != "1.2.3" {
+		t.Errorf("stamped: %q, want 1.2.3", got)
+	}
+	version = "dev"
+	// Test binaries carry no module version ("" or "(devel)"), so the
+	// fallback must yield "dev" here; go-install builds get Main.Version.
+	if got := versionString(); got != "dev" {
+		t.Errorf("unstamped: %q, want dev", got)
+	}
+}
+
 func TestInvocationName(t *testing.T) {
 	cases := map[string]string{
 		"/usr/local/bin/clau": "clau",

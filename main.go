@@ -6,10 +6,24 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 )
 
 var version = "dev"
+
+// versionString prefers the goreleaser-stamped version, falling back to
+// the module version for `go install` builds ("dev" for local builds,
+// whose build info carries no usable version).
+func versionString() string {
+	if version != "dev" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
+	}
+	return version
+}
 
 var reservedVerbs = map[string]bool{
 	"link": true, "unlink": true, "list": true, "run": true,
@@ -209,7 +223,7 @@ func cmdCompletions(args []string) {
 	}
 	fmt.Print(s)
 }
-func cmdVersion() { fmt.Println("clau " + version) }
+func cmdVersion() { fmt.Println("clau " + versionString()) }
 func cmdHelp()    { fmt.Print(helpText) }
 
 const helpText = `clau — model×effort shortcodes and launch profiles for Claude Code
