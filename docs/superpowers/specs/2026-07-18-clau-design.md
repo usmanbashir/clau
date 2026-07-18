@@ -183,11 +183,14 @@ Bare `c` with no args execs plain `claude`.
     profile named `at` must not silently shadow `cat`.
   - Sync: create missing, prune clau-owned links whose token no longer
     resolves, report created/skipped/pruned. Ownership = the link's
-    immediate target is the clau binary (by path, or basename `clau`
-    after brew upgrades move the real file). Never touch foreign files.
+    immediate target is the clau binary by path, or a clau-named target
+    that is dangling (a brew upgrade removed the old binary); a live
+    target that is not the clau binary is always foreign. Never touch foreign files.
   - Windows: write `.cmd` shims instead of symlinks:
     `@"<abs-path>\clau.exe" run <token> %*`, plus a marker comment line
-    identifying clau as the owner.
+    identifying clau as the owner. The bare "c" shim uses the internal
+    __launch verb (launcher entry, no token) so that "c list" on Windows
+    stays a launch rather than a management call.
 - `clau unlink [--dir DIR]` — remove all clau-owned links/shims in DIR.
 - `clau list` — the debugging view: every token → final claude argv
   preview and env keys it would set, and whether a link exists.

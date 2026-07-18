@@ -1,9 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -161,9 +163,43 @@ func main() {
 	}
 }
 
+func cmdLink(args []string) {
+	fs := flag.NewFlagSet("link", flag.ExitOnError)
+	dir := fs.String("dir", defaultLinkDir(), "directory for shortcut commands")
+	force := fs.Bool("force", false, "create even over collisions")
+	fs.Parse(args)
+	cfg := mustLoadConfig()
+	clauPath, err := clauExecutable()
+	if err != nil {
+		fatal("%v", err)
+	}
+	rep, err := syncLinks(cfg, *dir, clauPath, runtime.GOOS, *force)
+	if err != nil {
+		fatal("%v", err)
+	}
+	for _, s := range rep.Skipped {
+		fmt.Fprintf(os.Stderr, "clau: skipped %s\n", s)
+	}
+	fmt.Printf("linked %d, kept %d, skipped %d, pruned %d in %s\n",
+		len(rep.Created), len(rep.Kept), len(rep.Skipped), len(rep.Pruned), *dir)
+}
+
+func cmdUnlink(args []string) {
+	fs := flag.NewFlagSet("unlink", flag.ExitOnError)
+	dir := fs.String("dir", defaultLinkDir(), "directory for shortcut commands")
+	fs.Parse(args)
+	clauPath, err := clauExecutable()
+	if err != nil {
+		fatal("%v", err)
+	}
+	removed, err := removeOwned(*dir, clauPath)
+	if err != nil {
+		fatal("%v", err)
+	}
+	fmt.Printf("removed %d clau-owned commands from %s\n", len(removed), *dir)
+}
+
 // Stubs implemented in later tasks.
-func cmdLink(args []string)        { fatal("link: not implemented yet") }
-func cmdUnlink(args []string)      { fatal("unlink: not implemented yet") }
 func cmdList(args []string)        { fatal("list: not implemented yet") }
 func cmdInit(args []string)        { fatal("init: not implemented yet") }
 func cmdDoctor(args []string)      { fatal("doctor: not implemented yet") }
