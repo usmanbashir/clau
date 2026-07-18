@@ -223,7 +223,11 @@ func cmdCompletions(args []string) {
 	}
 	fmt.Print(s)
 }
-func cmdVersion() { fmt.Println("clau " + versionString()) }
+func cmdVersion() {
+	fmt.Println("clau " + versionString())
+	fmt.Println("Copyright (C) 2026 Usman Bashir. License GPL-3.0-or-later.")
+	fmt.Println("https://github.com/usmanbashir/clau")
+}
 func cmdHelp()    { fmt.Print(helpText) }
 
 const helpText = `clau — model×effort shortcodes and launch profiles for Claude Code
@@ -245,4 +249,5 @@ Management (clau only):
   clau version | help
 
 Config: $CLAU_CONFIG or ~/.config/clau/config.toml
+Project: https://github.com/usmanbashir/clau
 `
