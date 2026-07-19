@@ -325,12 +325,15 @@ func TestIntegrationProjectChangedFails(t *testing.T) {
 	if err := os.WriteFile(proj, []byte("[profiles.rev]\nmodel = \"sonnet\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err, _ := runInProject(t, bin, dir, projectGlobal, state, nil, "rev")
+	out, err, rec := runInProject(t, bin, dir, projectGlobal, state, nil, "rev")
 	if err == nil {
 		t.Fatalf("expected failure, got: %s", out)
 	}
 	if !strings.Contains(out, "changed since it was trusted") {
 		t.Errorf("stderr = %s", out)
+	}
+	if len(rec.argv) != 0 || len(rec.env) != 0 {
+		t.Errorf("claude must not run on a changed project config, recorded %+v", rec)
 	}
 }
 
@@ -426,6 +429,41 @@ func TestIntegrationListShowsProvenance(t *testing.T) {
 	}
 	if line := lineContaining(out, "rev"); !strings.Contains(line, "haiku") || !strings.Contains(line, "project") {
 		t.Errorf("trusted rev row must show the project override and source:\n%s", out)
+	}
+}
+
+// TestIntegrationLinkIgnoresProjectProfiles guards that `clau link` stays
+// global-only: even a trusted project file defining its own profile must
+// not produce a link for it, while global tokens still link normally.
+func TestIntegrationLinkIgnoresProjectProfiles(t *testing.T) {
+	bin := buildClau(t)
+	dir, proj := writeProject(t, projectLayer+"\n[profiles.deploy]\nflags = [\"-p\"]\n")
+	state := t.TempDir()
+	seedTrust(t, state, proj)
+	linkDir := t.TempDir()
+
+	out, err, _ := runInProject(t, bin, dir, projectGlobal, state, nil, "link", "--dir", linkDir)
+	if err != nil {
+		t.Fatalf("link: %v\n%s", err, out)
+	}
+
+	entries, rerr := os.ReadDir(linkDir)
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	names := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		names[e.Name()] = true
+	}
+	has := func(base string) bool {
+		// On Windows, link files get a .cmd suffix.
+		return names[base] || names[base+".cmd"]
+	}
+	if has("cdeploy") {
+		t.Errorf("clau link must ignore project-only profiles, but cdeploy exists: %v", names)
+	}
+	if !has("crev") {
+		t.Errorf("clau link must still link global tokens, crev missing: %v", names)
 	}
 }
 
