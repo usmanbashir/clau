@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -80,4 +81,72 @@ func hashFile(path string) (string, error) {
 	}
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+type ProjectStatus struct {
+	Path    string // discovered .clau.toml; "" if none in play
+	Trusted bool   // content hash matches the trust store
+	Changed bool   // in the store, but content differs
+	Applied bool   // layer merged into the returned Config
+}
+
+func sameFile(a, b string) bool {
+	fa, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	fb, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(fa, fb)
+}
+
+// loadEffectiveConfig loads the global config and, when a trusted
+// .clau.toml is discovered walking up from cwd, layers it on top.
+// enforce=true makes an untrusted or changed project file a hard error
+// (launch paths); enforce=false returns the global-only view plus
+// status (list, doctor). CLAU_NO_PROJECT (non-empty) skips discovery.
+func loadEffectiveConfig(cwd string, enforce bool) (Config, ProjectStatus, error) {
+	global, err := loadConfig(configPath())
+	if err != nil {
+		return Config{}, ProjectStatus{}, err
+	}
+	if os.Getenv("CLAU_NO_PROJECT") != "" {
+		return global, ProjectStatus{}, nil
+	}
+	proj := discoverProject(cwd)
+	if proj == "" || sameFile(proj, configPath()) {
+		return global, ProjectStatus{}, nil
+	}
+	st := ProjectStatus{Path: proj}
+	hash, err := hashFile(proj)
+	if err != nil {
+		return Config{}, st, fmt.Errorf("project config %s: %v", proj, err)
+	}
+	store, _ := loadTrust(trustPath())
+	switch stored, known := store[proj]; {
+	case known && stored == hash:
+		st.Trusted = true
+	case known:
+		st.Changed = true
+	}
+	if !st.Trusted {
+		if enforce {
+			reason := "is not trusted"
+			if st.Changed {
+				reason = "changed since it was trusted"
+			}
+			return Config{}, st, fmt.Errorf(
+				"project config %s %s; review with `clau trust --show`, then `clau trust` to allow (CLAU_NO_PROJECT=1 skips project configs)",
+				proj, reason)
+		}
+		return global, st, nil
+	}
+	layered, err := applyConfigFile(global, proj)
+	if err != nil {
+		return Config{}, st, err
+	}
+	st.Applied = true
+	return layered, st, nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -102,5 +103,132 @@ func TestHashFile(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("hashFile = %q, want %q", got, want)
+	}
+}
+
+// projectFixture writes a global config, a project dir with .clau.toml,
+// and points CLAU_CONFIG and XDG_STATE_HOME at per-test locations.
+// It returns the project dir and the project file path.
+func projectFixture(t *testing.T, globalTOML, projectTOML string) (string, string) {
+	t.Helper()
+	t.Setenv("CLAU_CONFIG", writeConfig(t, globalTOML))
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	dir := t.TempDir()
+	proj := filepath.Join(dir, ".clau.toml")
+	if err := os.WriteFile(proj, []byte(projectTOML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir, proj
+}
+
+func trustNow(t *testing.T, proj string) {
+	t.Helper()
+	hash, err := hashFile(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, _ := loadTrust(trustPath())
+	store[proj] = hash
+	if err := saveTrust(trustPath(), store); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLoadEffectiveConfigTrustedApplies(t *testing.T) {
+	dir, proj := projectFixture(t, "[profiles.rev]\nmodel = \"opus\"\n", "[profiles.rev]\nmodel = \"haiku\"\n")
+	trustNow(t, proj)
+	cfg, st, err := loadEffectiveConfig(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st.Trusted || !st.Applied || st.Path != proj {
+		t.Errorf("status = %+v", st)
+	}
+	if cfg.Profiles["rev"].Model != "haiku" {
+		t.Errorf("project layer not applied: %+v", cfg.Profiles["rev"])
+	}
+}
+
+func TestLoadEffectiveConfigUntrustedEnforceErrors(t *testing.T) {
+	dir, proj := projectFixture(t, "", "[profiles.rev]\nmodel = \"haiku\"\n")
+	_, _, err := loadEffectiveConfig(dir, true)
+	if err == nil {
+		t.Fatal("expected error for untrusted project config")
+	}
+	if !strings.Contains(err.Error(), proj) || !strings.Contains(err.Error(), "not trusted") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestLoadEffectiveConfigUntrustedNoEnforce(t *testing.T) {
+	dir, proj := projectFixture(t, "[profiles.rev]\nmodel = \"opus\"\n", "[profiles.rev]\nmodel = \"haiku\"\n")
+	cfg, st, err := loadEffectiveConfig(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Path != proj || st.Trusted || st.Applied || st.Changed {
+		t.Errorf("status = %+v", st)
+	}
+	if cfg.Profiles["rev"].Model != "opus" {
+		t.Errorf("untrusted layer leaked into config: %+v", cfg.Profiles["rev"])
+	}
+}
+
+func TestLoadEffectiveConfigChangedHash(t *testing.T) {
+	dir, proj := projectFixture(t, "", "[profiles.rev]\nmodel = \"haiku\"\n")
+	trustNow(t, proj)
+	if err := os.WriteFile(proj, []byte("[profiles.rev]\nmodel = \"opus\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, st, err := loadEffectiveConfig(dir, true)
+	if err == nil || !strings.Contains(err.Error(), "changed since it was trusted") {
+		t.Errorf("err = %v", err)
+	}
+	if !st.Changed {
+		t.Errorf("status = %+v", st)
+	}
+}
+
+func TestLoadEffectiveConfigEnvSkips(t *testing.T) {
+	dir, _ := projectFixture(t, "", "[profiles.rev]\nmodel = \"haiku\"\n")
+	t.Setenv("CLAU_NO_PROJECT", "1")
+	cfg, st, err := loadEffectiveConfig(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Path != "" {
+		t.Errorf("status = %+v, want no project", st)
+	}
+	if _, ok := cfg.Profiles["rev"]; ok {
+		t.Error("project profile applied despite CLAU_NO_PROJECT")
+	}
+}
+
+func TestLoadEffectiveConfigGlobalIsProjectFile(t *testing.T) {
+	dir := t.TempDir()
+	proj := filepath.Join(dir, ".clau.toml")
+	if err := os.WriteFile(proj, []byte("[profiles.rev]\nmodel = \"haiku\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAU_CONFIG", proj)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	cfg, st, err := loadEffectiveConfig(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Path != "" {
+		t.Errorf("global file must not double-apply as project layer: %+v", st)
+	}
+	if cfg.Profiles["rev"].Model != "haiku" {
+		t.Errorf("global config lost: %+v", cfg.Profiles)
+	}
+}
+
+func TestLoadEffectiveConfigTrustedParseError(t *testing.T) {
+	dir, proj := projectFixture(t, "", "[models\n")
+	trustNow(t, proj)
+	_, _, err := loadEffectiveConfig(dir, true)
+	if err == nil || !strings.Contains(err.Error(), proj) {
+		t.Errorf("err = %v, want parse error naming the project file", err)
 	}
 }
