@@ -46,12 +46,12 @@ func TestLoadConfigMissingFileGivesDefaults(t *testing.T) {
 }
 
 func TestLoadConfigMergesModels(t *testing.T) {
-	p := writeConfig(t, "[models]\ng = \"glm-4.7\"\no = \"claude-opus-4-8\"\n")
+	p := writeConfig(t, "[models]\ng = \"glm-5.2\"\no = \"claude-opus-4-8\"\n")
 	cfg, err := loadConfig(p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Models["g"].Model != "glm-4.7" || !cfg.Models["g"].Efforts {
+	if cfg.Models["g"].Model != "glm-5.2" || !cfg.Models["g"].Efforts {
 		t.Errorf("g = %+v", cfg.Models["g"])
 	}
 	if cfg.Models["o"].Model != "claude-opus-4-8" {
