@@ -272,6 +272,59 @@ func doctorFindings(cfg Config, cfgErr error, dir, clauPath, goos string) []find
 	return fs
 }
 
+// projectFindings reports the project layer's state for doctor. Nothing
+// here is a "fail": an untrusted file blocking launches is the designed
+// safe state, not a broken installation.
+func projectFindings(st ProjectStatus, store map[string]string, corrupt bool) []finding {
+	var fs []finding
+	if corrupt {
+		fs = append(fs, finding{"warn", fmt.Sprintf("trust store %s is unreadable; treating it as empty", trustPath())})
+	}
+	switch {
+	case st.Path == "":
+		fs = append(fs, finding{"ok", "no project config in effect"})
+	case st.Applied:
+		fs = append(fs, finding{"ok", fmt.Sprintf("project config %s trusted and applied", st.Path)})
+		if models, profiles, err := projectDeclarations(st.Path); err == nil {
+			var parts []string
+			if len(models) > 0 {
+				keys := make([]string, 0, len(models))
+				for k := range models {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				parts = append(parts, "models: "+strings.Join(keys, ", "))
+			}
+			if len(profiles) > 0 {
+				names := make([]string, 0, len(profiles))
+				for n := range profiles {
+					names = append(names, n)
+				}
+				sort.Strings(names)
+				parts = append(parts, "profiles: "+strings.Join(names, ", "))
+			}
+			if len(parts) > 0 {
+				fs = append(fs, finding{"ok", "project layer defines " + strings.Join(parts, "; ")})
+			}
+		}
+	case st.Changed:
+		fs = append(fs, finding{"warn", fmt.Sprintf("project config %s changed since it was trusted; launches will fail until `clau trust`", st.Path)})
+	default:
+		fs = append(fs, finding{"warn", fmt.Sprintf("project config %s is not trusted; launches will fail until `clau trust`", st.Path)})
+	}
+	paths := make([]string, 0, len(store))
+	for p := range store {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	for _, p := range paths {
+		if _, err := os.Stat(p); err != nil {
+			fs = append(fs, finding{"warn", fmt.Sprintf("trust entry for missing file %s", p)})
+		}
+	}
+	return fs
+}
+
 func cmdDoctor(args []string) {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	dir := fs.String("dir", defaultLinkDir(), "directory checked for links")
@@ -281,8 +334,19 @@ func cmdDoctor(args []string) {
 	if err != nil {
 		clauPath = ""
 	}
+	findings := doctorFindings(cfg, cfgErr, *dir, clauPath, runtime.GOOS)
+	if cfgErr == nil {
+		if cwd, err := os.Getwd(); err == nil {
+			if _, st, effErr := loadEffectiveConfig(cwd, false); effErr != nil {
+				findings = append(findings, finding{"fail", fmt.Sprintf("project config: %v", effErr)})
+			} else {
+				store, corrupt := loadTrust(trustPath())
+				findings = append(findings, projectFindings(st, store, corrupt)...)
+			}
+		}
+	}
 	failed := false
-	for _, f := range doctorFindings(cfg, cfgErr, *dir, clauPath, runtime.GOOS) {
+	for _, f := range findings {
 		fmt.Printf("%-4s %s\n", strings.ToUpper(f.Level), f.Msg)
 		if f.Level == "fail" {
 			failed = true

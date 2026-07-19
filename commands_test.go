@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -147,5 +149,62 @@ func TestListRowsSource(t *testing.T) {
 	}
 	if byToken["o5"].Source != "global" {
 		t.Errorf("o5 row = %+v", byToken["o5"])
+	}
+}
+
+func TestProjectFindings(t *testing.T) {
+	present := filepath.Join(t.TempDir(), ".clau.toml")
+	if err := os.WriteFile(present, []byte("[profiles.d]\nflags=[\"-p\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(t.TempDir(), "gone", ".clau.toml")
+	cases := []struct {
+		name string
+		st   ProjectStatus
+		want string
+	}{
+		{"none", ProjectStatus{}, "no project config"},
+		{"applied", ProjectStatus{Path: present, Trusted: true, Applied: true}, "trusted and applied"},
+		{"untrusted", ProjectStatus{Path: present}, "not trusted"},
+		{"changed", ProjectStatus{Path: present, Changed: true}, "changed since"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fs := projectFindings(c.st, map[string]string{missing: "x"}, true)
+			var text strings.Builder
+			for _, f := range fs {
+				text.WriteString(f.Level + " " + f.Msg + "\n")
+			}
+			out := text.String()
+			if !strings.Contains(out, c.want) {
+				t.Errorf("missing %q in:\n%s", c.want, out)
+			}
+			if !strings.Contains(out, "unreadable") {
+				t.Errorf("missing corrupt-store warn in:\n%s", out)
+			}
+			if !strings.Contains(out, missing) {
+				t.Errorf("missing stale-entry warn in:\n%s", out)
+			}
+			for _, f := range fs {
+				if f.Level == "fail" {
+					t.Errorf("project findings must never fail: %s", f.Msg)
+				}
+			}
+		})
+	}
+}
+
+func TestProjectFindingsListsDeclarations(t *testing.T) {
+	p := filepath.Join(t.TempDir(), ".clau.toml")
+	if err := os.WriteFile(p, []byte("[models]\ng = \"glm-5.2\"\n\n[profiles.deploy]\nflags=[\"-p\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var text strings.Builder
+	for _, f := range projectFindings(ProjectStatus{Path: p, Trusted: true, Applied: true}, nil, false) {
+		text.WriteString(f.Msg + "\n")
+	}
+	out := text.String()
+	if !strings.Contains(out, "deploy") || !strings.Contains(out, "g") {
+		t.Errorf("declarations not reported:\n%s", out)
 	}
 }
