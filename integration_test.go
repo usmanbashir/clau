@@ -277,7 +277,12 @@ func seedTrust(t *testing.T, state, proj string) {
 
 func writeProject(t *testing.T, body string) (string, string) {
 	t.Helper()
-	dir := t.TempDir()
+	// Resolve symlinks so trust-store keys and output assertions use the
+	// same path the clau child sees via os.Getwd (macOS /var -> /private/var).
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	proj := filepath.Join(dir, ".clau.toml")
 	if err := os.WriteFile(proj, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
