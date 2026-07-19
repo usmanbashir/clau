@@ -1480,8 +1480,9 @@ func TestProjectFindings(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			fs := projectFindings(c.st, map[string]string{missing: "x"}, true)
 			var text strings.Builder
-			for _, f := range projectFindings(c.st, map[string]string{missing: "x"}, true) {
+			for _, f := range fs {
 				text.WriteString(f.Level + " " + f.Msg + "\n")
 			}
 			out := text.String()
@@ -1494,8 +1495,10 @@ func TestProjectFindings(t *testing.T) {
 			if !strings.Contains(out, missing) {
 				t.Errorf("missing stale-entry warn in:\n%s", out)
 			}
-			if strings.Contains(out, "fail ") {
-				t.Errorf("project findings must never fail:\n%s", out)
+			for _, f := range fs {
+				if f.Level == "fail" {
+					t.Errorf("project findings must never fail: %s", f.Msg)
+				}
 			}
 		})
 	}
