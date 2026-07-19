@@ -397,3 +397,44 @@ func TestIntegrationTrustRefusesBrokenFile(t *testing.T) {
 		t.Errorf("stderr = %s", out)
 	}
 }
+
+func TestIntegrationListShowsProvenance(t *testing.T) {
+	bin := buildClau(t)
+	dir, proj := writeProject(t, projectLayer)
+	state := t.TempDir()
+
+	out, err, _ := runInProject(t, bin, dir, projectGlobal, state, nil, "list")
+	if err != nil {
+		t.Fatalf("list untrusted: %v\n%s", err, out)
+	}
+	// The default h model row always contains "haiku", so assert on the
+	// rev row specifically, not on the whole output.
+	if !strings.Contains(out, "NOT trusted") || strings.Contains(out, "SOURCE") {
+		t.Errorf("untrusted list must warn and stay in the global shape:\n%s", out)
+	}
+	if line := lineContaining(out, "rev"); !strings.Contains(line, "opus") {
+		t.Errorf("untrusted rev row must show the global launch:\n%s", out)
+	}
+
+	seedTrust(t, state, proj)
+	out, err, _ = runInProject(t, bin, dir, projectGlobal, state, nil, "list")
+	if err != nil {
+		t.Fatalf("list trusted: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "SOURCE") {
+		t.Errorf("trusted list must show the SOURCE column:\n%s", out)
+	}
+	if line := lineContaining(out, "rev"); !strings.Contains(line, "haiku") || !strings.Contains(line, "project") {
+		t.Errorf("trusted rev row must show the project override and source:\n%s", out)
+	}
+}
+
+// lineContaining returns the first output line containing substr.
+func lineContaining(out, substr string) string {
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, substr) {
+			return line
+		}
+	}
+	return ""
+}

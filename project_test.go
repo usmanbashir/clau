@@ -232,3 +232,21 @@ func TestLoadEffectiveConfigTrustedParseError(t *testing.T) {
 		t.Errorf("err = %v, want parse error naming the project file", err)
 	}
 }
+
+func TestProjectDeclarations(t *testing.T) {
+	p := filepath.Join(t.TempDir(), ".clau.toml")
+	body := "[models]\ng = \"glm-5.2\"\n\n[profiles.deploy]\nflags = [\"-p\"]\n"
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	models, profiles, err := projectDeclarations(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !models["g"] || len(models) != 1 {
+		t.Errorf("models = %v", models)
+	}
+	if !profiles["deploy"] || len(profiles) != 1 {
+		t.Errorf("profiles = %v", profiles)
+	}
+}

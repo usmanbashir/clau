@@ -41,7 +41,7 @@ func tokensOf(cfg Config) []string {
 }
 
 type listRow struct {
-	Token, Command, Linked, Preview string
+	Token, Command, Linked, Source, Preview string
 }
 
 func previewFor(cfg Config, token string) string {
@@ -66,7 +66,24 @@ func previewFor(cfg Config, token string) string {
 	return preview
 }
 
-func listRows(cfg Config, dir, clauPath, goos string) []listRow {
+// tokenSource reports where a token's effective definition comes from:
+// "project" for profiles the project file declares and for grammar
+// tokens of project-declared model letters, else "global".
+func tokenSource(token string, projModels, projProfiles map[string]bool) string {
+	if projProfiles[token] {
+		return "project"
+	}
+	letters := token
+	if last := token[len(token)-1]; last >= '0' && last <= '9' {
+		letters = token[:len(token)-1]
+	}
+	if projModels[letters] {
+		return "project"
+	}
+	return "global"
+}
+
+func listRows(cfg Config, dir, clauPath, goos string, projModels, projProfiles map[string]bool) []listRow {
 	var rows []listRow
 	for _, token := range tokensOf(cfg) {
 		command := "c" + token
@@ -74,7 +91,11 @@ func listRows(cfg Config, dir, clauPath, goos string) []listRow {
 		if isOwned(filepath.Join(dir, linkFileName(command, goos)), clauPath) {
 			linked = "yes"
 		}
-		rows = append(rows, listRow{Token: token, Command: command, Linked: linked, Preview: previewFor(cfg, token)})
+		rows = append(rows, listRow{
+			Token: token, Command: command, Linked: linked,
+			Source:  tokenSource(token, projModels, projProfiles),
+			Preview: previewFor(cfg, token),
+		})
 	}
 	return rows
 }
@@ -84,21 +105,50 @@ func cmdList(args []string) {
 	tokens := fs.Bool("tokens", false, "print bare tokens only")
 	dir := fs.String("dir", defaultLinkDir(), "directory checked for links")
 	fs.Parse(args)
-	cfg := mustLoadConfig()
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "."
+	}
+	cfg, st, err := loadEffectiveConfig(cwd, false)
+	if err != nil {
+		fatal("%v", err)
+	}
 	if *tokens {
 		for _, t := range tokensOf(cfg) {
 			fmt.Println(t)
 		}
 		return
 	}
+	var projModels, projProfiles map[string]bool
+	if st.Path != "" {
+		state := "trusted"
+		switch {
+		case st.Changed:
+			state = "changed, NOT applied — run `clau trust` to re-allow"
+		case !st.Trusted:
+			state = "NOT trusted, NOT applied — run `clau trust`"
+		}
+		fmt.Printf("project: %s (%s)\n", st.Path, state)
+		if st.Applied {
+			projModels, projProfiles, _ = projectDeclarations(st.Path)
+		}
+	}
 	clauPath, err := clauExecutable()
 	if err != nil {
 		clauPath = ""
 	}
 	w := tabwriter.NewWriter(os.Stdout, 2, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "TOKEN\tCOMMAND\tLINKED\tLAUNCHES")
-	for _, r := range listRows(cfg, *dir, clauPath, runtime.GOOS) {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.Token, r.Command, r.Linked, r.Preview)
+	if st.Applied {
+		fmt.Fprintln(w, "TOKEN\tCOMMAND\tLINKED\tSOURCE\tLAUNCHES")
+	} else {
+		fmt.Fprintln(w, "TOKEN\tCOMMAND\tLINKED\tLAUNCHES")
+	}
+	for _, r := range listRows(cfg, *dir, clauPath, runtime.GOOS, projModels, projProfiles) {
+		if st.Applied {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Token, r.Command, r.Linked, r.Source, r.Preview)
+		} else {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.Token, r.Command, r.Linked, r.Preview)
+		}
 	}
 	w.Flush()
 }

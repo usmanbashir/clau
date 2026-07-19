@@ -150,3 +150,21 @@ func loadEffectiveConfig(cwd string, enforce bool) (Config, ProjectStatus, error
 	st.Applied = true
 	return layered, st, nil
 }
+
+// projectDeclarations reports which model keys and profile names the
+// project file itself declares, for provenance display. The file has
+// already been validated by the time this is called.
+func projectDeclarations(path string) (map[string]bool, map[string]bool, error) {
+	var raw rawConfig
+	if _, err := toml.DecodeFile(path, &raw); err != nil {
+		return nil, nil, err
+	}
+	models, profiles := map[string]bool{}, map[string]bool{}
+	for k := range raw.Models {
+		models[k] = true
+	}
+	for k := range raw.Profiles {
+		profiles[k] = true
+	}
+	return models, profiles, nil
+}

@@ -49,7 +49,7 @@ func TestDoctorShadowWarningsSorted(t *testing.T) {
 func TestListRows(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.Profiles["work"] = Profile{Env: map[string]string{"B": "2", "A": "1"}}
-	rows := listRows(cfg, t.TempDir(), "/nonexistent/clau", "linux")
+	rows := listRows(cfg, t.TempDir(), "/nonexistent/clau", "linux", nil, nil)
 	byToken := map[string]listRow{}
 	for _, r := range rows {
 		byToken[r.Token] = r
@@ -110,5 +110,42 @@ func TestStarterConfigIsValidAndInert(t *testing.T) {
 	}
 	if cfg.Models["o"].Model != "opus" {
 		t.Errorf("starter config changed defaults: %+v", cfg.Models)
+	}
+}
+
+func TestTokenSource(t *testing.T) {
+	projModels := map[string]bool{"g": true}
+	projProfiles := map[string]bool{"rev": true}
+	cases := map[string]string{
+		"rev": "project", // declared profile, even if it shadows a global one
+		"g":   "project", // project model letter
+		"g5":  "project", // grammar token of a project model
+		"o5":  "global",
+		"s":   "global",
+	}
+	for token, want := range cases {
+		if got := tokenSource(token, projModels, projProfiles); got != want {
+			t.Errorf("tokenSource(%q) = %q, want %q", token, got, want)
+		}
+	}
+	if got := tokenSource("rev", nil, nil); got != "global" {
+		t.Errorf("nil maps must mean global, got %q", got)
+	}
+}
+
+func TestListRowsSource(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Profiles["rev"] = Profile{Model: "haiku"}
+	rows := listRows(cfg, t.TempDir(), "/nonexistent/clau", "linux",
+		nil, map[string]bool{"rev": true})
+	byToken := map[string]listRow{}
+	for _, r := range rows {
+		byToken[r.Token] = r
+	}
+	if byToken["rev"].Source != "project" {
+		t.Errorf("rev row = %+v", byToken["rev"])
+	}
+	if byToken["o5"].Source != "global" {
+		t.Errorf("o5 row = %+v", byToken["o5"])
 	}
 }
