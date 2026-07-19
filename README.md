@@ -17,7 +17,7 @@ clau makes the choice the command name:
     c s3 "explain this"  # same grammar, argument style
     c "fix this bug"     # unknown token? passes straight through
 
-<!-- demo: 20s asciinema/GIF goes here -->
+![Demo: co5 launches Opus at max effort; clau list shows every shortcut](docs/demo.gif)
 
 ## Install
 
