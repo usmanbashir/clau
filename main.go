@@ -249,7 +249,7 @@ func cmdVersion() {
 }
 func cmdHelp() { fmt.Print(helpText) }
 
-const helpText = `clau — model×effort shortcodes and launch profiles for Claude Code
+const helpText = `clau — launch Claude Code pre-configured in one word
 
 Usage:
   clau <token> [claude args...]    launch via shortcut token (same as c <token>)
