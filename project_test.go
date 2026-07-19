@@ -48,3 +48,59 @@ func TestDiscoverProjectSkipsDirectory(t *testing.T) {
 		t.Errorf("a directory named .clau.toml must be skipped: got %q, want %q", got, real)
 	}
 }
+
+func TestTrustPathXDG(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", filepath.Join("/tmp", "state"))
+	want := filepath.Join("/tmp", "state", "clau", "trust.toml")
+	if got := trustPath(); got != want {
+		t.Errorf("trustPath = %q, want %q", got, want)
+	}
+}
+
+func TestTrustRoundTrip(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "deep", "trust.toml")
+	store := map[string]string{"/proj/.clau.toml": "abc123"}
+	if err := saveTrust(p, store); err != nil {
+		t.Fatal(err)
+	}
+	got, corrupt := loadTrust(p)
+	if corrupt {
+		t.Fatal("round-tripped store reported corrupt")
+	}
+	if got["/proj/.clau.toml"] != "abc123" {
+		t.Errorf("store = %v", got)
+	}
+}
+
+func TestLoadTrustMissingIsEmpty(t *testing.T) {
+	store, corrupt := loadTrust(filepath.Join(t.TempDir(), "none.toml"))
+	if corrupt || len(store) != 0 {
+		t.Errorf("missing store: got %v corrupt=%v, want empty/false", store, corrupt)
+	}
+}
+
+func TestLoadTrustCorrupt(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "trust.toml")
+	if err := os.WriteFile(p, []byte("[trusted\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, corrupt := loadTrust(p)
+	if !corrupt || len(store) != 0 {
+		t.Errorf("corrupt store: got %v corrupt=%v, want empty/true", store, corrupt)
+	}
+}
+
+func TestHashFile(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "f")
+	if err := os.WriteFile(p, []byte("hello\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want := "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+	got, err := hashFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("hashFile = %q, want %q", got, want)
+	}
+}
