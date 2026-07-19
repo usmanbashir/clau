@@ -89,7 +89,22 @@ type rawConfig struct {
 }
 
 func loadConfig(path string) (Config, error) {
-	cfg := defaultConfig()
+	return applyConfigFile(defaultConfig(), path)
+}
+
+func cloneMap[V any](m map[string]V) map[string]V {
+	out := make(map[string]V, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+// applyConfigFile decodes path and merges it over cfg: models per key,
+// profiles per name (wholesale), a non-empty efforts table replaces the
+// ladder, claude if set. A missing file returns cfg unchanged. The maps
+// of the cfg argument are never mutated.
+func applyConfigFile(cfg Config, path string) (Config, error) {
 	var raw rawConfig
 	md, err := toml.DecodeFile(path, &raw)
 	if errors.Is(err, os.ErrNotExist) {
@@ -102,6 +117,8 @@ func loadConfig(path string) (Config, error) {
 		}
 		return Config{}, fmt.Errorf("%s: %w", path, err)
 	}
+	cfg.Models = cloneMap(cfg.Models)
+	cfg.Profiles = cloneMap(cfg.Profiles)
 	if raw.Claude != "" {
 		cfg.Claude = raw.Claude
 	}

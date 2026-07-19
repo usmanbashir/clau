@@ -150,3 +150,91 @@ func TestConfigPath(t *testing.T) {
 		t.Errorf("xdg: %q, want %q", got, want)
 	}
 }
+
+func TestApplyConfigFileLayersProject(t *testing.T) {
+	global := writeConfig(t, `
+[models]
+g = "glm-5.2"
+
+[profiles.rev]
+model = "opus"
+effort = "high"
+flags = ["--append-system-prompt", "Review code."]
+
+[profiles.work]
+env = { ANTHROPIC_BASE_URL = "https://gw.example" }
+`)
+	base, err := loadConfig(global)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := writeConfig(t, `
+claude = "claude-wrapper"
+
+[models]
+g = "glm-6.0"
+
+[efforts]
+1 = "minimal"
+
+[profiles.rev]
+model = "haiku"
+
+[profiles.deploy]
+flags = ["-p"]
+`)
+	layered, err := applyConfigFile(base, project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if layered.Claude != "claude-wrapper" {
+		t.Errorf("claude = %q, want claude-wrapper", layered.Claude)
+	}
+	if layered.Models["g"].Model != "glm-6.0" {
+		t.Errorf("g = %+v, want glm-6.0", layered.Models["g"])
+	}
+	if layered.Models["o"].Model != "opus" {
+		t.Errorf("o lost in layering: %+v", layered.Models["o"])
+	}
+	rev := layered.Profiles["rev"]
+	if rev.Model != "haiku" || rev.Effort != "" || len(rev.Flags) != 0 {
+		t.Errorf("project rev must replace global rev wholesale, got %+v", rev)
+	}
+	if layered.Profiles["work"].Env["ANTHROPIC_BASE_URL"] != "https://gw.example" {
+		t.Errorf("global-only profile lost: %+v", layered.Profiles["work"])
+	}
+	if _, ok := layered.Profiles["deploy"]; !ok {
+		t.Error("project-only profile missing")
+	}
+	if layered.Efforts["1"] != "minimal" || layered.Efforts["5"] != "" {
+		t.Errorf("non-empty project [efforts] must replace the whole ladder, got %v", layered.Efforts)
+	}
+}
+
+func TestApplyConfigFileDoesNotMutateBase(t *testing.T) {
+	base, err := loadConfig(writeConfig(t, "[profiles.rev]\nmodel = \"opus\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := writeConfig(t, "[models]\nz = \"zeta\"\n\n[profiles.rev]\nmodel = \"haiku\"\n")
+	if _, err := applyConfigFile(base, project); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := base.Models["z"]; ok {
+		t.Error("layering leaked a model key into the base config")
+	}
+	if base.Profiles["rev"].Model != "opus" {
+		t.Errorf("layering mutated base profile: %+v", base.Profiles["rev"])
+	}
+}
+
+func TestApplyConfigFileMissingFileIsNoop(t *testing.T) {
+	base := defaultConfig()
+	got, err := applyConfigFile(base, filepath.Join(t.TempDir(), "absent.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Models["o"].Model != "opus" || len(got.Profiles) != 0 {
+		t.Errorf("missing file must be a no-op, got %+v", got)
+	}
+}
