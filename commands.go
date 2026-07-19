@@ -116,7 +116,7 @@ s = "sonnet"
 f = "fable"
 h = { model = "haiku", efforts = false }
 # Add your own — one line yields <letter>, <letter>1..5 and their commands:
-#g = "glm-4.7"
+#g = "glm-5.2"
 
 # Profiles: named shortcuts carrying flags and env.
 # Run "clau link" after editing to sync shortcut commands.
