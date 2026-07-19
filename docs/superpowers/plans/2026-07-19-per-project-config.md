@@ -1648,9 +1648,9 @@ allow it once:
 
 Untrusted or changed files are a hard error at launch — never silently
 applied. `clau list` and `clau doctor` still work untrusted and show
-what would change. Project-only profiles stay argument-style
-(`c deploy`); `clau link` links global tokens only, and a linked
-global command like `crev` picks up the project's override
+that a project file is present. Project-only profiles stay
+argument-style (`c deploy`); `clau link` links global tokens only, and
+a linked global command like `crev` picks up the project's override
 automatically. `CLAU_NO_PROJECT=1` skips the layer entirely.
 ```
 
