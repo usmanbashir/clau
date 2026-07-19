@@ -71,6 +71,27 @@ flags = ["--bare", "--strict-mcp-config"]
 Your own flags always win: `crev --model sonnet` runs the rev profile
 on Sonnet. `c -- anything` skips resolution entirely.
 
+## Per-project config
+
+A repo can carry its own `.clau.toml` — same format — and clau layers
+it over your global config when you launch from inside the project:
+`[models]` merge per key, a project profile replaces its global
+namesake wholesale. Commit the file and the whole team shares the
+project's launch shapes.
+
+Because a repo file can set env and flags, nothing applies until you
+allow it once:
+
+    clau trust --show    # read what the project wants
+    clau trust           # allow it (re-asks whenever the file changes)
+
+Untrusted or changed files are a hard error at launch — never silently
+applied. `clau list` and `clau doctor` still work untrusted and show
+what would change. Project-only profiles stay argument-style
+(`c deploy`); `clau link` links global tokens only, and a linked
+global command like `crev` picks up the project's override
+automatically. `CLAU_NO_PROJECT=1` skips the layer entirely.
+
 ## Why not shell aliases?
 
 clau began as fish functions in my dotfiles, generalized so the same
@@ -99,6 +120,8 @@ defaults. `clau init` writes a fully commented reference config.
     clau list [--tokens] [--dir DIR]  every token → what it launches
     clau run <token> [args...]        explicit launcher (errors on unknown token)
     clau init [--force]               write a starter config
+    clau trust [--show]               allow (or print) the project .clau.toml
+    clau untrust                      revoke that trust
     clau doctor [--dir DIR]           config, PATH, collisions, stale links
     clau completions fish|zsh|bash    tab completion
 
