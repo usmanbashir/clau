@@ -242,3 +242,66 @@ func cmdDoctor(args []string) {
 		os.Exit(1)
 	}
 }
+
+func cmdTrust(args []string) {
+	fs := flag.NewFlagSet("trust", flag.ExitOnError)
+	show := fs.Bool("show", false, "print the project config instead of trusting it")
+	fs.Parse(args)
+	cwd, err := os.Getwd()
+	if err != nil {
+		fatal("%v", err)
+	}
+	proj := discoverProject(cwd)
+	if proj == "" {
+		fatal("no .clau.toml found from %s upward", cwd)
+	}
+	if *show {
+		data, err := os.ReadFile(proj)
+		if err != nil {
+			fatal("%v", err)
+		}
+		fmt.Printf("-- %s\n", proj)
+		os.Stdout.Write(data)
+		return
+	}
+	global, err := loadConfig(configPath())
+	if err != nil {
+		fatal("%v", err)
+	}
+	if _, err := applyConfigFile(global, proj); err != nil {
+		fatal("refusing to trust: %v", err)
+	}
+	hash, err := hashFile(proj)
+	if err != nil {
+		fatal("%v", err)
+	}
+	store, corrupt := loadTrust(trustPath())
+	if corrupt {
+		fmt.Fprintf(os.Stderr, "clau: trust store was unreadable; rewriting %s\n", trustPath())
+	}
+	store[proj] = hash
+	if err := saveTrust(trustPath(), store); err != nil {
+		fatal("%v", err)
+	}
+	fmt.Printf("trusted %s (%s)\n", proj, hash[:12])
+}
+
+func cmdUntrust(args []string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fatal("%v", err)
+	}
+	proj := discoverProject(cwd)
+	if proj == "" {
+		fatal("no .clau.toml found from %s upward", cwd)
+	}
+	store, _ := loadTrust(trustPath())
+	if _, ok := store[proj]; !ok {
+		fatal("%s is not in the trust store", proj)
+	}
+	delete(store, proj)
+	if err := saveTrust(trustPath(), store); err != nil {
+		fatal("%v", err)
+	}
+	fmt.Printf("untrusted %s\n", proj)
+}

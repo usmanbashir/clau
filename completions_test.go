@@ -19,3 +19,15 @@ func TestCompletionScript(t *testing.T) {
 		t.Error("unknown shell must error")
 	}
 }
+
+func TestCompletionsIncludeTrustVerbs(t *testing.T) {
+	for _, shell := range []string{"fish", "zsh", "bash"} {
+		s, err := completionScript(shell)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(s, "trust untrust") {
+			t.Errorf("%s completions missing trust verbs", shell)
+		}
+	}
+}

@@ -346,3 +346,54 @@ func TestIntegrationNoProjectEnvSkips(t *testing.T) {
 		t.Errorf("argv = %q, want global --model opus", got)
 	}
 }
+
+func TestIntegrationTrustVerbFlow(t *testing.T) {
+	bin := buildClau(t)
+	dir, proj := writeProject(t, projectLayer)
+	state := t.TempDir()
+
+	out, err, _ := runInProject(t, bin, dir, projectGlobal, state, nil, "trust", "--show")
+	if err != nil {
+		t.Fatalf("trust --show: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, proj) || !strings.Contains(out, "haiku") {
+		t.Errorf("trust --show output = %s", out)
+	}
+
+	out, err, _ = runInProject(t, bin, dir, projectGlobal, state, nil, "trust")
+	if err != nil {
+		t.Fatalf("trust: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "trusted "+proj) {
+		t.Errorf("trust output = %s", out)
+	}
+
+	out, err, rec := runInProject(t, bin, dir, projectGlobal, state, nil, "rev")
+	if err != nil {
+		t.Fatalf("launch after trust: %v\n%s", err, out)
+	}
+	if got := strings.Join(rec.argv, "\t"); got != "--model\thaiku" {
+		t.Errorf("argv = %q, want --model haiku", got)
+	}
+
+	out, err, _ = runInProject(t, bin, dir, projectGlobal, state, nil, "untrust")
+	if err != nil {
+		t.Fatalf("untrust: %v\n%s", err, out)
+	}
+	out, err, _ = runInProject(t, bin, dir, projectGlobal, state, nil, "rev")
+	if err == nil {
+		t.Fatalf("launch after untrust must fail, got: %s", out)
+	}
+}
+
+func TestIntegrationTrustRefusesBrokenFile(t *testing.T) {
+	bin := buildClau(t)
+	dir, _ := writeProject(t, "[models\n")
+	out, err, _ := runInProject(t, bin, dir, projectGlobal, t.TempDir(), nil, "trust")
+	if err == nil {
+		t.Fatalf("expected refusal, got: %s", out)
+	}
+	if !strings.Contains(out, "refusing to trust") {
+		t.Errorf("stderr = %s", out)
+	}
+}

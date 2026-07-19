@@ -27,7 +27,8 @@ func versionString() string {
 
 var reservedVerbs = map[string]bool{
 	"link": true, "unlink": true, "list": true, "run": true,
-	"init": true, "doctor": true, "completions": true,
+	"init": true, "trust": true, "untrust": true,
+	"doctor": true, "completions": true,
 	"version": true, "help": true, "__launch": true,
 }
 
@@ -166,6 +167,10 @@ func runManagement(verb string, args []string) {
 		runLauncher(args)
 	case "init":
 		cmdInit(args)
+	case "trust":
+		cmdTrust(args)
+	case "untrust":
+		cmdUntrust(args)
 	case "doctor":
 		cmdDoctor(args)
 	case "completions":
@@ -258,10 +263,13 @@ Management (clau only):
   clau list [--tokens] [--dir DIR] show tokens, commands, and launches
   clau run <token> [args...]       explicit launcher (errors on unknown token)
   clau init [--force]              write a starter config
+  clau trust [--show]              allow (or print) the project .clau.toml
+  clau untrust                     revoke trust for the project config
   clau doctor [--dir DIR]          check config, claude, PATH, links
   clau completions <shell>         fish|zsh|bash completion script
   clau version | help
 
 Config: $CLAU_CONFIG or ~/.config/clau/config.toml
+Per-project: nearest .clau.toml once allowed via clau trust (CLAU_NO_PROJECT=1 skips)
 Project: https://github.com/usmanbashir/clau
 `
