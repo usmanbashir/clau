@@ -74,13 +74,18 @@ func saveTrust(path string, store map[string]string) error {
 	return toml.NewEncoder(f).Encode(trustFile{Trusted: store})
 }
 
+// hashBytes returns the lowercase hex SHA-256 digest of data.
+func hashBytes(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
 func hashFile(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:]), nil
+	return hashBytes(data), nil
 }
 
 type ProjectStatus struct {
@@ -120,10 +125,11 @@ func loadEffectiveConfig(cwd string, enforce bool) (Config, ProjectStatus, error
 		return global, ProjectStatus{}, nil
 	}
 	st := ProjectStatus{Path: proj}
-	hash, err := hashFile(proj)
+	data, err := os.ReadFile(proj)
 	if err != nil {
 		return Config{}, st, fmt.Errorf("project config %s: %v", proj, err)
 	}
+	hash := hashBytes(data)
 	store, _ := loadTrust(trustPath())
 	switch stored, known := store[proj]; {
 	case known && stored == hash:
@@ -143,7 +149,7 @@ func loadEffectiveConfig(cwd string, enforce bool) (Config, ProjectStatus, error
 		}
 		return global, st, nil
 	}
-	layered, err := applyConfigFile(global, proj)
+	layered, err := applyConfigData(global, proj, data)
 	if err != nil {
 		return Config{}, st, err
 	}

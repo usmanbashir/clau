@@ -382,13 +382,14 @@ func cmdTrust(args []string) {
 	if err != nil {
 		fatal("%v", err)
 	}
-	if _, err := applyConfigFile(global, proj); err != nil {
-		fatal("refusing to trust: %v", err)
-	}
-	hash, err := hashFile(proj)
+	data, err := os.ReadFile(proj)
 	if err != nil {
 		fatal("%v", err)
 	}
+	if _, err := applyConfigData(global, proj, data); err != nil {
+		fatal("refusing to trust: %v", err)
+	}
+	hash := hashBytes(data)
 	store, corrupt := loadTrust(trustPath())
 	if corrupt {
 		fmt.Fprintf(os.Stderr, "clau: trust store was unreadable; rewriting %s\n", trustPath())

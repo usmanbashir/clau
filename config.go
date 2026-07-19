@@ -100,16 +100,28 @@ func cloneMap[V any](m map[string]V) map[string]V {
 	return out
 }
 
-// applyConfigFile decodes path and merges it over cfg: models per key,
-// profiles per name (wholesale), a non-empty efforts table replaces the
-// ladder, claude if set. A missing file returns cfg unchanged. The maps
-// of the cfg argument are never mutated.
+// applyConfigFile reads path and delegates to applyConfigData. A missing
+// file returns cfg unchanged, nil error.
 func applyConfigFile(cfg Config, path string) (Config, error) {
-	var raw rawConfig
-	md, err := toml.DecodeFile(path, &raw)
+	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return cfg, nil
 	}
+	if err != nil {
+		return Config{}, fmt.Errorf("%s: %w", path, err)
+	}
+	return applyConfigData(cfg, path, data)
+}
+
+// applyConfigData decodes data and merges it over cfg: models per key,
+// profiles per name (wholesale), a non-empty efforts table replaces the
+// ladder, claude if set. path is used only to name errors, so a caller
+// that must hash and apply the exact same bytes can read the file once
+// and pass the bytes to both. The maps of the cfg argument are never
+// mutated.
+func applyConfigData(cfg Config, path string, data []byte) (Config, error) {
+	var raw rawConfig
+	md, err := toml.Decode(string(data), &raw)
 	if err != nil {
 		var pe toml.ParseError
 		if errors.As(err, &pe) {
