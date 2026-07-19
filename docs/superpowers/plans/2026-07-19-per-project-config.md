@@ -1417,13 +1417,13 @@ func cmdList(args []string) {
 		clauPath = ""
 	}
 	w := tabwriter.NewWriter(os.Stdout, 2, 4, 2, ' ', 0)
-	if st.Path != "" {
+	if st.Applied {
 		fmt.Fprintln(w, "TOKEN\tCOMMAND\tLINKED\tSOURCE\tLAUNCHES")
 	} else {
 		fmt.Fprintln(w, "TOKEN\tCOMMAND\tLINKED\tLAUNCHES")
 	}
 	for _, r := range listRows(cfg, *dir, clauPath, runtime.GOOS, projModels, projProfiles) {
-		if st.Path != "" {
+		if st.Applied {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Token, r.Command, r.Linked, r.Source, r.Preview)
 		} else {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.Token, r.Command, r.Linked, r.Preview)
