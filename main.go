@@ -85,6 +85,20 @@ func mustLoadConfig() Config {
 	return cfg
 }
 
+// mustLoadEffectiveConfig is mustLoadConfig plus the trusted project
+// layer; launch paths use it so an untrusted .clau.toml is a hard error.
+func mustLoadEffectiveConfig() Config {
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "."
+	}
+	cfg, _, err := loadEffectiveConfig(cwd, true)
+	if err != nil {
+		fatal("%v", err)
+	}
+	return cfg
+}
+
 func launch(cfg Config, res TokenResolution, extra []string) {
 	l := buildLaunch(cfg, res, extra)
 	if err := execClaude(l); err != nil {
@@ -93,7 +107,7 @@ func launch(cfg Config, res TokenResolution, extra []string) {
 }
 
 func runLauncher(args []string) {
-	cfg := mustLoadConfig()
+	cfg := mustLoadEffectiveConfig()
 	if len(args) > 0 {
 		if args[0] == "--" {
 			launch(cfg, TokenResolution{}, args[1:])
@@ -112,7 +126,7 @@ func runLauncher(args []string) {
 }
 
 func runNamed(token string, args []string) {
-	cfg := mustLoadConfig()
+	cfg := mustLoadEffectiveConfig()
 	res, found, err := resolveToken(cfg, token)
 	if err != nil {
 		fatal("%v", err)
@@ -127,7 +141,7 @@ func cmdRun(args []string) {
 	if len(args) == 0 {
 		fatal("run requires a shortcut token; see `clau list`")
 	}
-	cfg := mustLoadConfig()
+	cfg := mustLoadEffectiveConfig()
 	res, found, err := resolveToken(cfg, args[0])
 	if err != nil {
 		fatal("%v", err)

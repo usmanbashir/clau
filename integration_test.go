@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -92,6 +94,7 @@ func runShortcut(t *testing.T, bin, invokeAs, configTOML string, args ...string)
 		"PATH="+fakeClaudeDir+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"CLAU_TEST_OUT="+outFile,
 		"CLAU_CONFIG="+cfgFile,
+		"CLAU_NO_PROJECT=1",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -191,7 +194,7 @@ func TestIntegrationStaleNameErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := exec.Command(link)
-	cmd.Env = append(os.Environ(), "CLAU_CONFIG="+filepath.Join(dir, "none.toml"))
+	cmd.Env = append(os.Environ(), "CLAU_CONFIG="+filepath.Join(dir, "none.toml"), "CLAU_NO_PROJECT=1")
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected failure, got: %s", out)
@@ -207,12 +210,139 @@ func TestIntegrationBrokenConfigFailsEvenOnPassthrough(t *testing.T) {
 	cfg := filepath.Join(dir, "config.toml")
 	os.WriteFile(cfg, []byte("[models\n"), 0o644)
 	cmd := exec.Command(bin, "hello")
-	cmd.Env = append(os.Environ(), "CLAU_CONFIG="+cfg)
+	cmd.Env = append(os.Environ(), "CLAU_CONFIG="+cfg, "CLAU_NO_PROJECT=1")
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected failure, got: %s", out)
 	}
 	if !strings.Contains(string(out), "clau:") {
 		t.Errorf("stderr = %s", out)
+	}
+}
+
+// runInProject runs bin with cwd set to dir, CLAU_CONFIG pointing at a
+// global config written from globalTOML, XDG_STATE_HOME at state, and
+// the fake claude on PATH. It returns combined output, the error, and
+// whatever the fake claude recorded (zero recorded if it never ran).
+func runInProject(t *testing.T, bin, dir, globalTOML, state string, extraEnv []string, args ...string) (string, error, recorded) {
+	t.Helper()
+	outFile := filepath.Join(t.TempDir(), "out.txt")
+	cfgFile := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(cfgFile, []byte(globalTOML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(bin, args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"PATH="+fakeClaudeDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"CLAU_TEST_OUT="+outFile,
+		"CLAU_CONFIG="+cfgFile,
+		"XDG_STATE_HOME="+state,
+	)
+	cmd.Env = append(cmd.Env, extraEnv...)
+	out, err := cmd.CombinedOutput()
+	rec := recorded{env: map[string]string{}}
+	if data, rerr := os.ReadFile(outFile); rerr == nil {
+		for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+			fields := strings.Split(line, "\t")
+			switch fields[0] {
+			case "ARGV":
+				rec.argv = fields[1:]
+			case "ENV":
+				k, v, _ := strings.Cut(fields[1], "=")
+				rec.env[k] = v
+			}
+		}
+	}
+	return string(out), err, rec
+}
+
+// seedTrust writes a trust store in state covering the given project file.
+func seedTrust(t *testing.T, state, proj string) {
+	t.Helper()
+	data, err := os.ReadFile(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(data)
+	dir := filepath.Join(state, "clau")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	entry := fmt.Sprintf("[trusted]\n%q = %q\n", proj, hex.EncodeToString(sum[:]))
+	if err := os.WriteFile(filepath.Join(dir, "trust.toml"), []byte(entry), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeProject(t *testing.T, body string) (string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	proj := filepath.Join(dir, ".clau.toml")
+	if err := os.WriteFile(proj, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir, proj
+}
+
+const projectGlobal = "[profiles.rev]\nmodel = \"opus\"\n"
+const projectLayer = "[profiles.rev]\nmodel = \"haiku\"\n"
+
+func TestIntegrationProjectTrustedOverrides(t *testing.T) {
+	bin := buildClau(t)
+	dir, proj := writeProject(t, projectLayer)
+	state := t.TempDir()
+	seedTrust(t, state, proj)
+	out, err, rec := runInProject(t, bin, dir, projectGlobal, state, nil, "rev")
+	if err != nil {
+		t.Fatalf("launch failed: %v\n%s", err, out)
+	}
+	if got := strings.Join(rec.argv, "\t"); got != "--model\thaiku" {
+		t.Errorf("argv = %q, want project override --model haiku", got)
+	}
+}
+
+func TestIntegrationProjectUntrustedFails(t *testing.T) {
+	bin := buildClau(t)
+	dir, _ := writeProject(t, projectLayer)
+	out, err, rec := runInProject(t, bin, dir, projectGlobal, t.TempDir(), nil, "rev")
+	if err == nil {
+		t.Fatalf("expected failure, got: %s", out)
+	}
+	if !strings.Contains(out, "not trusted") || !strings.Contains(out, "clau trust") {
+		t.Errorf("stderr = %s", out)
+	}
+	if len(rec.argv) != 0 || len(rec.env) != 0 {
+		t.Errorf("claude must not run untrusted, recorded %+v", rec)
+	}
+}
+
+func TestIntegrationProjectChangedFails(t *testing.T) {
+	bin := buildClau(t)
+	dir, proj := writeProject(t, projectLayer)
+	state := t.TempDir()
+	seedTrust(t, state, proj)
+	if err := os.WriteFile(proj, []byte("[profiles.rev]\nmodel = \"sonnet\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err, _ := runInProject(t, bin, dir, projectGlobal, state, nil, "rev")
+	if err == nil {
+		t.Fatalf("expected failure, got: %s", out)
+	}
+	if !strings.Contains(out, "changed since it was trusted") {
+		t.Errorf("stderr = %s", out)
+	}
+}
+
+func TestIntegrationNoProjectEnvSkips(t *testing.T) {
+	bin := buildClau(t)
+	dir, _ := writeProject(t, projectLayer)
+	out, err, rec := runInProject(t, bin, dir, projectGlobal, t.TempDir(),
+		[]string{"CLAU_NO_PROJECT=1"}, "rev")
+	if err != nil {
+		t.Fatalf("launch failed: %v\n%s", err, out)
+	}
+	if got := strings.Join(rec.argv, "\t"); got != "--model\topus" {
+		t.Errorf("argv = %q, want global --model opus", got)
 	}
 }
