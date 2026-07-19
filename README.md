@@ -21,20 +21,18 @@ clau makes the choice the command name:
 
 ## Install
 
-    brew install usmanbashir/tap/clau               # macOS
+    brew install usmanbashir/tap/clau               # macOS and Linux
     go install github.com/usmanbashir/clau@latest   # anywhere with Go
 
 Prebuilt archives for six platforms are on the
 [releases page](https://github.com/usmanbashir/clau/releases).
-(`go install` builds report `clau dev` — version stamping happens in
-release builds.)
 
 ## Quick start
 
-    clau init            # write a starter config
     clau link            # generate shortcut commands in ~/.local/bin
     co5                  # you're in Opus at max effort
 
+Zero config needed — the built-in letters below work out of the box.
 If a shortcut isn't found, run `clau doctor` — it checks your config,
 PATH, collisions, and links, and says what to fix.
 
@@ -46,7 +44,7 @@ alone = model only. Built-in letters: `o` opus, `s` sonnet, `f` fable,
 `h` haiku (haiku takes no effort digit — the CLI would silently
 downgrade it, so clau errors instead).
 
-Add a model in one line — `g = "glm-4.7"` — and `g`, `g1`…`g5`, plus
+Add a model in one line — `g = "glm-5.2"` — and `g`, `g1`…`g5`, plus
 commands `cg`, `cg1`…`cg5` all exist.
 
 ## Profiles
@@ -75,8 +73,8 @@ on Sonnet. `c -- anything` skips resolution entirely.
 
 ## Why not shell aliases?
 
-clau began as fish functions in the author's dotfiles, generalized so
-the same idea works without fish — or any shell config at all:
+clau began as fish functions in my dotfiles, generalized so the same
+idea works without fish — or any shell config at all:
 
 - One static binary and one TOML file, identical in fish, zsh, bash,
   and on Windows. No dotfiles to sync.
@@ -100,6 +98,7 @@ defaults. `clau init` writes a fully commented reference config.
     clau unlink [--dir DIR]           remove everything clau created
     clau list [--tokens] [--dir DIR]  every token → what it launches
     clau run <token> [args...]        explicit launcher (errors on unknown token)
+    clau init [--force]               write a starter config
     clau doctor [--dir DIR]           config, PATH, collisions, stale links
     clau completions fish|zsh|bash    tab completion
 
