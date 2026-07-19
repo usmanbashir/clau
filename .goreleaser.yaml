@@ -23,7 +23,7 @@ homebrew_casks:
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/usmanbashir/clau
-    description: Model×effort shortcodes and launch profiles for Claude Code
+    description: Launch Claude Code pre-configured in one word
     hooks:
       post:
         install: |
