@@ -170,6 +170,15 @@ h = { model = "haiku", efforts = false }
 # serves; for another backend use a profile (see below).
 #g = "glm-5.2"
 
+# The digit ladder is configurable too — a non-empty [efforts] table
+# maps digits 1..9 to --effort values and replaces the default five:
+#[efforts]
+#1 = "low"
+#2 = "medium"
+#3 = "high"
+#4 = "xhigh"
+#5 = "max"
+
 # Profiles: named shortcuts carrying flags and env.
 # Run "clau link" after editing to sync shortcut commands.
 

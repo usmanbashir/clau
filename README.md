@@ -42,7 +42,9 @@ PATH, collisions, and links, and says what to fix.
 config, the digit 1–5 picks effort low/medium/high/xhigh/max. Letter
 alone = model only. Built-in letters: `o` opus, `s` sonnet, `f` fable,
 `h` haiku (haiku takes no effort digit — the CLI would silently
-downgrade it, so clau errors instead).
+downgrade it, so clau errors instead). The digit ladder is itself
+config: an `[efforts]` table remaps digits `1`–`9` to `--effort`
+values, replacing the default five.
 
 Add a model in one line — `g = "glm-5.2"` — and `g`, `g1`…`g5` all
 resolve (re-run `clau link` and the commands `cg`, `cg1`…`cg5` exist
@@ -80,10 +82,11 @@ on Sonnet. `c -- anything` skips resolution entirely.
 ## Other backends
 
 Claude Code will talk to any endpoint that speaks the Anthropic
-Messages API — Ollama and LM Studio serve it natively, LiteLLM translates for
-everything else, and [LLM gateways](https://code.claude.com/docs/en/llm-gateway)
-add org auth and routing on top. Switching backends is environment,
-and environment lives in profiles:
+Messages API — Ollama and LM Studio serve it natively, LiteLLM
+translates for everything else, and
+[LLM gateways](https://code.claude.com/docs/en/llm-gateway) add org
+auth and routing on top. Switching backends is environment, and
+environment lives in profiles:
 
 ```toml
 [profiles.gem]           # gemma on a local Ollama
@@ -109,9 +112,9 @@ many models, one `[models]` line per model really is the whole job.)
 
 A repo can carry its own `.clau.toml` — same format — and clau layers
 it over your global config when you launch from inside the project:
-`[models]` merge per key, a project profile replaces its global
-namesake wholesale. Commit the file and the whole team shares the
-project's launch shapes.
+`[models]` merge per key, a project profile or `[efforts]` table
+replaces its global namesake wholesale. Commit the file and the whole
+team shares the project's launch shapes.
 
 Because a repo file can set env and flags, nothing applies until you
 allow it once:
@@ -144,8 +147,10 @@ idea works without fish — or any shell config at all:
 ## Config
 
 `$CLAU_CONFIG` or `${XDG_CONFIG_HOME:-~/.config}/clau/config.toml`.
-Missing file = defaults. Your `[models]` entries merge over the
-defaults. `clau init` writes a fully commented reference config.
+Missing file = defaults. `[models]` entries merge over the built-in
+letters, profiles are all yours (none are built in), and a
+non-empty `[efforts]` table replaces the digit ladder wholesale.
+`clau init` writes a fully commented reference config.
 
 ## Commands
 
