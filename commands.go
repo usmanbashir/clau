@@ -165,7 +165,9 @@ o = "opus"
 s = "sonnet"
 f = "fable"
 h = { model = "haiku", efforts = false }
-# Add your own — one line yields <letter>, <letter>1..5 and their commands:
+# Add your own — one line yields <letter>, <letter>1..5 and, after
+# "clau link", their commands. The model must be one your backend
+# serves; for another backend use a profile (see below).
 #g = "glm-5.2"
 
 # Profiles: named shortcuts carrying flags and env.
@@ -182,9 +184,21 @@ h = { model = "haiku", efforts = false }
 #model = "haiku"
 #flags = ["-p", "--max-budget-usd", "0.25"]
 
-# Backend/account switch:
+# LLM gateway / account switch:
 #[profiles.work]
 #env = { ANTHROPIC_BASE_URL = "https://gateway.corp.example" }
+
+# Local backend — anything speaking the Anthropic Messages API works
+# (Ollama, LM Studio, LiteLLM): https://code.claude.com/docs/en/llm-gateway
+# BASE_URL carries no /v1 suffix; the auth token is a throwaway the
+# server ignores, Claude Code just needs one set; DEFAULT_HAIKU_MODEL keeps
+# background tasks on the local model too.
+#[profiles.gem]
+#model = "gemma4:12b"
+#[profiles.gem.env]
+#ANTHROPIC_BASE_URL = "http://localhost:11434"
+#ANTHROPIC_AUTH_TOKEN = "ollama"
+#ANTHROPIC_DEFAULT_HAIKU_MODEL = "gemma4:12b"
 
 # Lean startup (skip hooks, MCP, plugins):
 #[profiles.lean]

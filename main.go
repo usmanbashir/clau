@@ -269,7 +269,7 @@ Management (clau only):
   clau completions <shell>         fish|zsh|bash completion script
   clau version | help
 
-Config: $CLAU_CONFIG or ~/.config/clau/config.toml
+Config: $CLAU_CONFIG or ~/.config/clau/config.toml ([models] + [profiles])
 Per-project: nearest .clau.toml once allowed via clau trust (CLAU_NO_PROJECT=1 skips)
 Project: https://github.com/usmanbashir/clau
 `

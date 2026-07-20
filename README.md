@@ -44,12 +44,18 @@ alone = model only. Built-in letters: `o` opus, `s` sonnet, `f` fable,
 `h` haiku (haiku takes no effort digit — the CLI would silently
 downgrade it, so clau errors instead).
 
-Add a model in one line — `g = "glm-5.2"` — and `g`, `g1`…`g5`, plus
-commands `cg`, `cg1`…`cg5` all exist.
+Add a model in one line — `g = "glm-5.2"` — and `g`, `g1`…`g5` all
+resolve (re-run `clau link` and the commands `cg`, `cg1`…`cg5` exist
+too). One line is enough when your backend serves the model; to aim a
+shortcut at a different backend, use a profile — see
+[Other backends](#other-backends).
 
 ## Profiles
 
-Named shortcuts that carry flags and environment. Four directions:
+Named shortcuts that carry flags and environment — the two things a
+`[models]` letter can't hold. The name is the whole token (no effort
+digits; pin `effort` here or pass `--effort` at launch). Four
+directions:
 
 ```toml
 [profiles.rev]           # persona
@@ -61,7 +67,7 @@ flags = ["--append-system-prompt", "You are a meticulous code reviewer."]
 model = "haiku"
 flags = ["-p", "--max-budget-usd", "0.25"]
 
-[profiles.work]          # backend/account switch
+[profiles.work]          # LLM gateway / account switch
 env = { ANTHROPIC_BASE_URL = "https://gateway.corp.example" }
 
 [profiles.lean]          # context loadout: fast, hookless startup
@@ -70,6 +76,34 @@ flags = ["--bare", "--strict-mcp-config"]
 
 Your own flags always win: `crev --model sonnet` runs the rev profile
 on Sonnet. `c -- anything` skips resolution entirely.
+
+## Other backends
+
+Claude Code will talk to any endpoint that speaks the Anthropic
+Messages API — Ollama and LM Studio serve it natively, LiteLLM translates for
+everything else, and [LLM gateways](https://code.claude.com/docs/en/llm-gateway)
+add org auth and routing on top. Switching backends is environment,
+and environment lives in profiles:
+
+```toml
+[profiles.gem]           # gemma on a local Ollama
+model = "gemma4:12b"
+flags = ["--bare", "--strict-mcp-config"]  # small models drown in big context
+
+[profiles.gem.env]
+# no /v1 suffix — Claude Code appends /v1/messages itself
+ANTHROPIC_BASE_URL = "http://localhost:11434"
+# throwaway: the server ignores it, Claude Code just needs one set
+ANTHROPIC_AUTH_TOKEN = "ollama"
+# background tasks stay on the local model too
+ANTHROPIC_DEFAULT_HAIKU_MODEL = "gemma4:12b"
+```
+
+`cgem` runs Claude Code entirely against the local model; `co5` still
+talks to Anthropic. A `[models]` letter can't switch backends — it
+only picks a model name, served by whatever backend your environment
+already points at. (Which is why, behind a LiteLLM router fronting
+many models, one `[models]` line per model really is the whole job.)
 
 ## Per-project config
 
