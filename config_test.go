@@ -124,6 +124,8 @@ func TestLoadConfigRejectsBadInput(t *testing.T) {
 		{"bad effort key", "[efforts]\n10 = \"ten\"\n", "effort key"},
 		{"empty effort value", "[efforts]\n1 = \"\"\n", "effort"},
 		{"bad profile name", "[profiles.Bad_Name]\nmodel = \"opus\"\n", "profile name"},
+		{"bad base name", "[bases.Bad_Name]\nmodel = \"x\"\n", "base name"},
+		{"extends inside base", "[bases.b]\nextends = \"other\"\n", "extends"},
 		{"unknown top key", "clude = \"typo\"\n", "clude"},
 		{"unknown model field", "[models]\nz = { model = \"x\", effrots = false }\n", "effrots"},
 		{"unknown profile field", "[profiles.p]\nmodle = \"x\"\n", "modle"},
@@ -236,5 +238,56 @@ func TestApplyConfigFileMissingFileIsNoop(t *testing.T) {
 	}
 	if got.Models["o"].Model != "opus" || len(got.Profiles) != 0 {
 		t.Errorf("missing file must be a no-op, got %+v", got)
+	}
+}
+
+func TestLoadConfigParsesBases(t *testing.T) {
+	p := writeConfig(t, `
+[bases.ollama]
+flags = ["--bare", "--strict-mcp-config"]
+env = { ANTHROPIC_BASE_URL = "http://ollama.lan:11434" }
+`)
+	cfg, err := loadConfig(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := cfg.Bases["ollama"]
+	if len(b.Flags) != 2 || b.Flags[0] != "--bare" {
+		t.Errorf("flags = %v", b.Flags)
+	}
+	if b.Env["ANTHROPIC_BASE_URL"] != "http://ollama.lan:11434" {
+		t.Errorf("env = %v", b.Env)
+	}
+	if len(cfg.Profiles) != 0 {
+		t.Errorf("bases must not create profiles: %v", cfg.Profiles)
+	}
+}
+
+func TestApplyConfigFileReplacesBasesWholesale(t *testing.T) {
+	base, err := loadConfig(writeConfig(t, `
+[bases.ollama]
+model = "gemma4:12b"
+env = { ANTHROPIC_BASE_URL = "http://ollama.lan:11434" }
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := writeConfig(t, `
+[bases.ollama]
+env = { ANTHROPIC_BASE_URL = "http://team-gpu-box:11434" }
+`)
+	layered, err := applyConfigFile(base, project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := layered.Bases["ollama"]
+	if b.Env["ANTHROPIC_BASE_URL"] != "http://team-gpu-box:11434" {
+		t.Errorf("env = %v", b.Env)
+	}
+	if b.Model != "" {
+		t.Errorf("wholesale replace must drop model, got %q", b.Model)
+	}
+	if base.Bases["ollama"].Model != "gemma4:12b" {
+		t.Errorf("layering mutated the base config: %+v", base.Bases["ollama"])
 	}
 }

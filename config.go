@@ -28,6 +28,7 @@ type Config struct {
 	Claude   string
 	Models   map[string]ModelSpec
 	Efforts  map[string]string
+	Bases    map[string]Profile
 	Profiles map[string]Profile
 }
 
@@ -43,6 +44,7 @@ func defaultConfig() Config {
 		Efforts: map[string]string{
 			"1": "low", "2": "medium", "3": "high", "4": "xhigh", "5": "max",
 		},
+		Bases:    map[string]Profile{},
 		Profiles: map[string]Profile{},
 	}
 }
@@ -81,10 +83,21 @@ type rawProfile struct {
 	Claude string            `toml:"claude"`
 }
 
+// rawBase is rawProfile without extends: bases cannot chain, and the
+// missing field makes `extends` inside [bases.*] an unknown-key error.
+type rawBase struct {
+	Model  string            `toml:"model"`
+	Effort string            `toml:"effort"`
+	Flags  []string          `toml:"flags"`
+	Env    map[string]string `toml:"env"`
+	Claude string            `toml:"claude"`
+}
+
 type rawConfig struct {
 	Claude   string                    `toml:"claude"`
 	Models   map[string]toml.Primitive `toml:"models"`
 	Efforts  map[string]string         `toml:"efforts"`
+	Bases    map[string]rawBase        `toml:"bases"`
 	Profiles map[string]rawProfile     `toml:"profiles"`
 }
 
@@ -130,6 +143,7 @@ func applyConfigData(cfg Config, path string, data []byte) (Config, error) {
 		return Config{}, fmt.Errorf("%s: %w", path, err)
 	}
 	cfg.Models = cloneMap(cfg.Models)
+	cfg.Bases = cloneMap(cfg.Bases)
 	cfg.Profiles = cloneMap(cfg.Profiles)
 	if raw.Claude != "" {
 		cfg.Claude = raw.Claude
@@ -169,6 +183,15 @@ func applyConfigData(cfg Config, path string, data []byte) (Config, error) {
 				return Config{}, fmt.Errorf("%s: effort %q: empty level", path, key)
 			}
 			cfg.Efforts[key] = level
+		}
+	}
+	for name, rb := range raw.Bases {
+		if !profileNameRe.MatchString(name) {
+			return Config{}, fmt.Errorf("%s: invalid base name %q (want ^[a-z][a-z0-9-]*$)", path, name)
+		}
+		cfg.Bases[name] = Profile{
+			Model: rb.Model, Effort: rb.Effort, Flags: rb.Flags,
+			Env: rb.Env, Claude: rb.Claude,
 		}
 	}
 	for name, rp := range raw.Profiles {
