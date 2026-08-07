@@ -13,7 +13,7 @@ clau makes the choice the command name:
 
     co5                  # claude --model opus --effort max
     cs1                  # sonnet on the cheap
-    crev                 # your code-review persona: model + flags + env
+    crev                 # your code-review persona: model + effort + flags
     c s3 "explain this"  # same grammar, argument style
     c "fix this bug"     # unknown token? passes straight through
 
@@ -56,8 +56,9 @@ shortcut at a different backend, use a profile — see
 
 Named shortcuts that carry flags and environment — the two things a
 `[models]` letter can't hold. The name is the whole token (no effort
-digits; pin `effort` here or pass `--effort` at launch). Four
-directions:
+digits; pin `effort` here or pass `--effort` at launch), and a
+profile can also name the `claude` binary it should exec — a
+wrapper, a fork, a pinned version. Four directions:
 
 ```toml
 [profiles.rev]           # persona
@@ -187,6 +188,7 @@ non-empty `[efforts]` table replaces the digit ladder wholesale.
     clau untrust                      revoke that trust
     clau doctor [--dir DIR]           config, PATH, collisions, stale links
     clau completions fish|zsh|bash    tab completion
+    clau version | help               version and license / command help
 
 For fish, persist completions with
 `clau completions fish > ~/.config/fish/conf.d/clau.fish` (`conf.d`,
