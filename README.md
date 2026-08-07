@@ -79,29 +79,15 @@ flags = ["--bare", "--strict-mcp-config"]
 Your own flags always win: `crev --model sonnet` runs the rev profile
 on Sonnet. `c -- anything` skips resolution entirely.
 
-When several profiles share a backend, put the shared parts in a
-base and point each profile at it with `extends` — a base is never a
-command itself:
-
-```toml
-[bases.ollama]
-flags = ["--bare", "--strict-mcp-config"]
-env = { ANTHROPIC_BASE_URL = "http://ollama.lan:11434", ANTHROPIC_AUTH_TOKEN = "ollama" }
-
-[profiles.q27]
-extends = "ollama"
-model = "qwen3.6:27b"
-env = { ANTHROPIC_DEFAULT_HAIKU_MODEL = "qwen3.6:27b" }
-
-[profiles.g12]
-extends = "ollama"
-model = "gemma4:12b"
-env = { ANTHROPIC_DEFAULT_HAIKU_MODEL = "gemma4:12b" }
-```
-
-`env` merges per key and `flags` concatenate (base's first); `model`,
-`effort`, and `claude` fill in only where the profile leaves them
-unset. Change the host once and every profile built on it follows.
+When several profiles share flags or environment — five local models
+on one backend, say — put the shared parts in a base and point each
+profile at it with `extends`. A base is never a command itself.
+`env` merges per key, `flags` concatenate (base's first), and
+`model`, `effort`, and `claude` fill in only where the profile
+leaves them unset: change the host once and every profile built on
+it follows. The worked example is in
+[Other backends](#other-backends), backend sharing being the
+motivating case.
 
 ## Other backends
 
@@ -110,27 +96,38 @@ Messages API — Ollama and LM Studio serve it natively, LiteLLM
 translates for everything else, and
 [LLM gateways](https://code.claude.com/docs/en/llm-gateway) add org
 auth and routing on top. Switching backends is environment, and
-environment lives in profiles:
+environment lives in profiles — shared through a base when several
+models ride the same backend:
 
 ```toml
-[profiles.gem]           # gemma on a local Ollama
-model = "gemma4:12b"
+[bases.ollama]
 flags = ["--bare", "--strict-mcp-config"]  # small models drown in big context
 
-[profiles.gem.env]
+[bases.ollama.env]
 # no /v1 suffix — Claude Code appends /v1/messages itself
 ANTHROPIC_BASE_URL = "http://localhost:11434"
 # throwaway: the server ignores it, Claude Code just needs one set
 ANTHROPIC_AUTH_TOKEN = "ollama"
+
+[profiles.gem]           # gemma on the local Ollama
+extends = "ollama"
+model = "gemma4:12b"
 # background tasks stay on the local model too
-ANTHROPIC_DEFAULT_HAIKU_MODEL = "gemma4:12b"
+env = { ANTHROPIC_DEFAULT_HAIKU_MODEL = "gemma4:12b" }
+
+[profiles.q27]
+extends = "ollama"
+model = "qwen3.6:27b"
+env = { ANTHROPIC_DEFAULT_HAIKU_MODEL = "qwen3.6:27b" }
 ```
 
-`cgem` runs Claude Code entirely against the local model; `co5` still
-talks to Anthropic. A `[models]` letter can't switch backends — it
-only picks a model name, served by whatever backend your environment
-already points at. (Which is why, behind a LiteLLM router fronting
-many models, one `[models]` line per model really is the whole job.)
+`cgem` and `cq27` run Claude Code entirely against the local model;
+`co5` still talks to Anthropic, and changing the host is one edit. A
+single profile can of course carry the env inline without a base. A
+`[models]` letter can't switch backends — it only picks a model
+name, served by whatever backend your environment already points at.
+(Which is why, behind a LiteLLM router fronting many models, one
+`[models]` line per model really is the whole job.)
 
 ## Per-project config
 
