@@ -472,6 +472,50 @@ func TestIntegrationLinkIgnoresProjectProfiles(t *testing.T) {
 	}
 }
 
+func TestIntegrationExtendsReachesLaunch(t *testing.T) {
+	bin := buildClau(t)
+	rec := runShortcut(t, bin, "clau", `
+[bases.ollama]
+flags = ["--bare"]
+env = { ANTHROPIC_BASE_URL = "http://ollama.lan:11434", ANTHROPIC_AUTH_TOKEN = "ollama" }
+
+[profiles.q27]
+extends = "ollama"
+model = "qwen3.6:27b"
+env = { ANTHROPIC_DEFAULT_HAIKU_MODEL = "qwen3.6:27b" }
+`, "run", "q27")
+	if got := strings.Join(rec.argv, "\t"); got != "--model\tqwen3.6:27b\t--bare" {
+		t.Errorf("argv = %q, want model then inherited flags", got)
+	}
+	if rec.env["ANTHROPIC_BASE_URL"] != "http://ollama.lan:11434" {
+		t.Errorf("inherited env missing: ANTHROPIC_BASE_URL = %q", rec.env["ANTHROPIC_BASE_URL"])
+	}
+	if rec.env["ANTHROPIC_AUTH_TOKEN"] != "ollama" {
+		t.Errorf("inherited env missing: ANTHROPIC_AUTH_TOKEN = %q", rec.env["ANTHROPIC_AUTH_TOKEN"])
+	}
+	if rec.env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] != "qwen3.6:27b" {
+		t.Errorf("child env missing: ANTHROPIC_DEFAULT_HAIKU_MODEL = %q", rec.env["ANTHROPIC_DEFAULT_HAIKU_MODEL"])
+	}
+}
+
+func TestIntegrationProjectProfileExtendsGlobalBase(t *testing.T) {
+	bin := buildClau(t)
+	dir, proj := writeProject(t, "[profiles.team]\nextends = \"ollama\"\nmodel = \"qwen3.6:27b\"\n")
+	state := t.TempDir()
+	seedTrust(t, state, proj)
+	global := "[bases.ollama]\nenv = { ANTHROPIC_BASE_URL = \"http://ollama.lan:11434\" }\n"
+	out, err, rec := runInProject(t, bin, dir, global, state, nil, "team")
+	if err != nil {
+		t.Fatalf("launch failed: %v\n%s", err, out)
+	}
+	if got := strings.Join(rec.argv, "\t"); got != "--model\tqwen3.6:27b" {
+		t.Errorf("argv = %q", got)
+	}
+	if rec.env["ANTHROPIC_BASE_URL"] != "http://ollama.lan:11434" {
+		t.Errorf("project profile must inherit the global base env, got %q", rec.env["ANTHROPIC_BASE_URL"])
+	}
+}
+
 // lineContaining returns the first output line containing substr.
 func lineContaining(out, substr string) string {
 	for _, line := range strings.Split(out, "\n") {
