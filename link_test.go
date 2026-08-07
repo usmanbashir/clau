@@ -381,3 +381,21 @@ func TestForeignInPathWindowsBareNameNeedsExecExtension(t *testing.T) {
 		t.Errorf("windows: foreignInPath(%q) = %q, want %q", "tool.exe", got, preExtd)
 	}
 }
+
+func TestLinkNamesSkipBases(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Bases = map[string]Profile{"ollama": {Flags: []string{"--bare"}}}
+	cfg.Profiles = map[string]Profile{"q27": {Model: "qwen3.6:27b"}}
+	var sawProfile bool
+	for _, n := range linkNames(cfg) {
+		if n == "collama" {
+			t.Fatal("a base must not produce a command")
+		}
+		if n == "cq27" {
+			sawProfile = true
+		}
+	}
+	if !sawProfile {
+		t.Error("profile command cq27 missing")
+	}
+}

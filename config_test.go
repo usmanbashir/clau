@@ -375,3 +375,58 @@ env = { ANTHROPIC_BASE_URL = "http://team-gpu-box:11434" }
 		t.Errorf("layering mutated the base config: %+v", base.Bases["ollama"])
 	}
 }
+
+func TestApplyConfigFileProfileExtendsGlobalBase(t *testing.T) {
+	base, err := loadConfig(writeConfig(t, `
+[bases.ollama]
+env = { ANTHROPIC_BASE_URL = "http://ollama.lan:11434" }
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := writeConfig(t, `
+[profiles.q27]
+extends = "ollama"
+model = "qwen3.6:27b"
+`)
+	layered, err := applyConfigFile(base, project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := layered.Profiles["q27"]
+	if q.Env["ANTHROPIC_BASE_URL"] != "http://ollama.lan:11434" {
+		t.Errorf("project profile must flatten against the global base, got %+v", q)
+	}
+}
+
+func TestApplyConfigFileBaseOverrideScopedToDeclaringFile(t *testing.T) {
+	base, err := loadConfig(writeConfig(t, `
+[bases.ollama]
+env = { ANTHROPIC_BASE_URL = "http://ollama.lan:11434" }
+
+[profiles.q27]
+extends = "ollama"
+model = "qwen3.6:27b"
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := writeConfig(t, `
+[bases.ollama]
+env = { ANTHROPIC_BASE_URL = "http://team-gpu-box:11434" }
+
+[profiles.team]
+extends = "ollama"
+model = "qwen3.6:27b"
+`)
+	layered, err := applyConfigFile(base, project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := layered.Profiles["q27"].Env["ANTHROPIC_BASE_URL"]; got != "http://ollama.lan:11434" {
+		t.Errorf("global child rerouted by a project base override (early binding broken): %q", got)
+	}
+	if got := layered.Profiles["team"].Env["ANTHROPIC_BASE_URL"]; got != "http://team-gpu-box:11434" {
+		t.Errorf("project child must see the project's base: %q", got)
+	}
+}
