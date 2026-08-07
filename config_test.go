@@ -116,6 +116,87 @@ func TestLoadConfigEffortsOverrideReplacesWholesale(t *testing.T) {
 	}
 }
 
+func TestLoadConfigExtendsFlattens(t *testing.T) {
+	p := writeConfig(t, `
+[bases.ollama]
+effort = "low"
+flags = ["--bare", "--strict-mcp-config"]
+env = { ANTHROPIC_BASE_URL = "http://ollama.lan:11434", ANTHROPIC_AUTH_TOKEN = "ollama" }
+
+[profiles.q27]
+extends = "ollama"
+model = "qwen3.6:27b"
+effort = "high"
+flags = ["-p"]
+env = { ANTHROPIC_AUTH_TOKEN = "other", ANTHROPIC_DEFAULT_HAIKU_MODEL = "qwen3.6:27b" }
+`)
+	cfg, err := loadConfig(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := cfg.Profiles["q27"]
+	if q.Model != "qwen3.6:27b" {
+		t.Errorf("model = %q", q.Model)
+	}
+	if q.Effort != "high" {
+		t.Errorf("child effort must win, got %q", q.Effort)
+	}
+	want := "--bare --strict-mcp-config -p"
+	if got := strings.Join(q.Flags, " "); got != want {
+		t.Errorf("flags = %q, want %q (base first, child appended)", got, want)
+	}
+	if q.Env["ANTHROPIC_BASE_URL"] != "http://ollama.lan:11434" {
+		t.Errorf("base env key lost: %v", q.Env)
+	}
+	if q.Env["ANTHROPIC_AUTH_TOKEN"] != "other" {
+		t.Errorf("child env key must win per key: %v", q.Env)
+	}
+	if q.Env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] != "qwen3.6:27b" {
+		t.Errorf("child-only env key lost: %v", q.Env)
+	}
+}
+
+func TestLoadConfigExtendsScalarFillIn(t *testing.T) {
+	p := writeConfig(t, `
+[profiles.child]
+extends = "b"
+
+[bases.b]
+model = "gemma4:12b"
+effort = "low"
+claude = "claude-alt"
+`)
+	cfg, err := loadConfig(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := cfg.Profiles["child"]
+	if c.Model != "gemma4:12b" || c.Effort != "low" || c.Claude != "claude-alt" {
+		t.Errorf("child = %+v, want base scalars filled in", c)
+	}
+}
+
+func TestLoadConfigExtendsDoesNotMutateBase(t *testing.T) {
+	p := writeConfig(t, `
+[bases.b]
+flags = ["--bare"]
+env = { A = "1" }
+
+[profiles.x]
+extends = "b"
+flags = ["-p"]
+env = { A = "2", B = "3" }
+`)
+	cfg, err := loadConfig(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := cfg.Bases["b"]
+	if len(b.Env) != 1 || b.Env["A"] != "1" || len(b.Flags) != 1 {
+		t.Errorf("flatten mutated the stored base: %+v", b)
+	}
+}
+
 func TestLoadConfigRejectsBadInput(t *testing.T) {
 	cases := []struct{ name, body, wantErr string }{
 		{"parse error", "[models\n", "config.toml"},
@@ -129,6 +210,9 @@ func TestLoadConfigRejectsBadInput(t *testing.T) {
 		{"unknown top key", "clude = \"typo\"\n", "clude"},
 		{"unknown model field", "[models]\nz = { model = \"x\", effrots = false }\n", "effrots"},
 		{"unknown profile field", "[profiles.p]\nmodle = \"x\"\n", "modle"},
+		{"empty extends", "[profiles.p]\nextends = \"\"\n", "empty extends"},
+		{"unknown base", "[profiles.p]\nextends = \"nope\"\n", "unknown base"},
+		{"extends a profile", "[profiles.rev]\nmodel = \"opus\"\n\n[profiles.p]\nextends = \"rev\"\n", "references [bases]"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

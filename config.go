@@ -76,11 +76,12 @@ type rawModel struct {
 }
 
 type rawProfile struct {
-	Model  string            `toml:"model"`
-	Effort string            `toml:"effort"`
-	Flags  []string          `toml:"flags"`
-	Env    map[string]string `toml:"env"`
-	Claude string            `toml:"claude"`
+	Model   string            `toml:"model"`
+	Effort  string            `toml:"effort"`
+	Flags   []string          `toml:"flags"`
+	Env     map[string]string `toml:"env"`
+	Claude  string            `toml:"claude"`
+	Extends *string           `toml:"extends"`
 }
 
 // rawBase is rawProfile without extends: bases cannot chain, and the
@@ -109,6 +110,34 @@ func cloneMap[V any](m map[string]V) map[string]V {
 	out := make(map[string]V, len(m))
 	for k, v := range m {
 		out[k] = v
+	}
+	return out
+}
+
+// flattenProfile fills child fields from base where the child leaves
+// them unset: scalars fill in, flags concatenate base-first, env merges
+// key-wise with the child winning. The result shares no slice or map
+// storage with base, so later layers cannot mutate stored bases.
+func flattenProfile(base, child Profile) Profile {
+	out := child
+	if out.Model == "" {
+		out.Model = base.Model
+	}
+	if out.Effort == "" {
+		out.Effort = base.Effort
+	}
+	if out.Claude == "" {
+		out.Claude = base.Claude
+	}
+	if len(base.Flags) > 0 {
+		out.Flags = append(append([]string{}, base.Flags...), child.Flags...)
+	}
+	if len(base.Env) > 0 {
+		env := cloneMap(base.Env)
+		for k, v := range child.Env {
+			env[k] = v
+		}
+		out.Env = env
 	}
 	return out
 }
@@ -198,10 +227,27 @@ func applyConfigData(cfg Config, path string, data []byte) (Config, error) {
 		if !profileNameRe.MatchString(name) {
 			return Config{}, fmt.Errorf("%s: invalid profile name %q (want ^[a-z][a-z0-9-]*$)", path, name)
 		}
-		cfg.Profiles[name] = Profile{
+		p := Profile{
 			Model: rp.Model, Effort: rp.Effort, Flags: rp.Flags,
 			Env: rp.Env, Claude: rp.Claude,
 		}
+		if rp.Extends != nil {
+			parent := *rp.Extends
+			if parent == "" {
+				return Config{}, fmt.Errorf("%s: profile %q: empty extends", path, name)
+			}
+			base, ok := cfg.Bases[parent]
+			if !ok {
+				_, inFile := raw.Profiles[parent]
+				_, inCfg := cfg.Profiles[parent]
+				if inFile || inCfg {
+					return Config{}, fmt.Errorf("%s: profile %q: extends %q, which is a profile; extends references [bases]", path, name, parent)
+				}
+				return Config{}, fmt.Errorf("%s: profile %q: extends unknown base %q", path, name, parent)
+			}
+			p = flattenProfile(base, p)
+		}
+		cfg.Profiles[name] = p
 	}
 	if undec := md.Undecoded(); len(undec) > 0 {
 		keys := make([]string, len(undec))
