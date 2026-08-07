@@ -110,6 +110,9 @@ func TestStarterConfigIsValidAndInert(t *testing.T) {
 	if len(cfg.Profiles) != 0 {
 		t.Errorf("starter config defines active profiles: %v (examples must be commented out)", cfg.Profiles)
 	}
+	if len(cfg.Bases) != 0 {
+		t.Errorf("starter config defines active bases: %v (examples must be commented out)", cfg.Bases)
+	}
 	if cfg.Models["o"].Model != "opus" {
 		t.Errorf("starter config changed defaults: %+v", cfg.Models)
 	}

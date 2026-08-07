@@ -79,6 +79,30 @@ flags = ["--bare", "--strict-mcp-config"]
 Your own flags always win: `crev --model sonnet` runs the rev profile
 on Sonnet. `c -- anything` skips resolution entirely.
 
+When several profiles share a backend, put the shared parts in a
+base and point each profile at it with `extends` — a base is never a
+command itself:
+
+```toml
+[bases.ollama]
+flags = ["--bare", "--strict-mcp-config"]
+env = { ANTHROPIC_BASE_URL = "http://ollama.lan:11434", ANTHROPIC_AUTH_TOKEN = "ollama" }
+
+[profiles.q27]
+extends = "ollama"
+model = "qwen3.6:27b"
+env = { ANTHROPIC_DEFAULT_HAIKU_MODEL = "qwen3.6:27b" }
+
+[profiles.g12]
+extends = "ollama"
+model = "gemma4:12b"
+env = { ANTHROPIC_DEFAULT_HAIKU_MODEL = "gemma4:12b" }
+```
+
+`env` merges per key and `flags` concatenate (base's first); `model`,
+`effort`, and `claude` fill in only where the profile leaves them
+unset. Change the host once and every profile built on it follows.
+
 ## Other backends
 
 Claude Code will talk to any endpoint that speaks the Anthropic
@@ -112,9 +136,12 @@ many models, one `[models]` line per model really is the whole job.)
 
 A repo can carry its own `.clau.toml` — same format — and clau layers
 it over your global config when you launch from inside the project:
-`[models]` merge per key, a project profile or `[efforts]` table
-replaces its global namesake wholesale. Commit the file and the whole
-team shares the project's launch shapes.
+`[models]` merge per key, a project profile, base, or `[efforts]`
+table replaces its global namesake wholesale. A project profile may
+extend a global base, but inheritance resolves when each file is
+read — overriding a base in a project file only affects profiles
+that file itself declares. Commit the file and the whole team shares
+the project's launch shapes.
 
 Because a repo file can set env and flags, nothing applies until you
 allow it once:
@@ -148,7 +175,7 @@ idea works without fish — or any shell config at all:
 
 `$CLAU_CONFIG` or `${XDG_CONFIG_HOME:-~/.config}/clau/config.toml`.
 Missing file = defaults. `[models]` entries merge over the built-in
-letters, profiles are all yours (none are built in), and a
+letters, profiles and bases are all yours (none are built in), and a
 non-empty `[efforts]` table replaces the digit ladder wholesale.
 `clau init` writes a fully commented reference config.
 

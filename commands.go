@@ -199,15 +199,28 @@ h = { model = "haiku", efforts = false }
 
 # Local backend — anything speaking the Anthropic Messages API works
 # (Ollama, LM Studio, LiteLLM): https://code.claude.com/docs/en/llm-gateway
+# Shared backend settings live in [bases]; profiles opt in with
+# extends. A base is never a command itself. env merges per key,
+# flags concatenate (base's first), model/effort/claude fill in where
+# the profile leaves them unset.
 # BASE_URL carries no /v1 suffix; the auth token is a throwaway the
 # server ignores, Claude Code just needs one set; DEFAULT_HAIKU_MODEL keeps
 # background tasks on the local model too.
-#[profiles.gem]
-#model = "gemma4:12b"
-#[profiles.gem.env]
+#[bases.ollama]
+#flags = ["--bare", "--strict-mcp-config"]  # small models drown in big context
+#[bases.ollama.env]
 #ANTHROPIC_BASE_URL = "http://localhost:11434"
 #ANTHROPIC_AUTH_TOKEN = "ollama"
-#ANTHROPIC_DEFAULT_HAIKU_MODEL = "gemma4:12b"
+
+#[profiles.gem]
+#extends = "ollama"
+#model = "gemma4:12b"
+#env = { ANTHROPIC_DEFAULT_HAIKU_MODEL = "gemma4:12b" }
+
+#[profiles.qwen]
+#extends = "ollama"
+#model = "qwen3.6:27b"
+#env = { ANTHROPIC_DEFAULT_HAIKU_MODEL = "qwen3.6:27b" }
 
 # Lean startup (skip hooks, MCP, plugins):
 #[profiles.lean]
