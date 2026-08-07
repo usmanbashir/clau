@@ -156,8 +156,10 @@ func applyConfigFile(cfg Config, path string) (Config, error) {
 }
 
 // applyConfigData decodes data and merges it over cfg: models per key,
-// profiles per name (wholesale), a non-empty efforts table replaces the
-// ladder, claude if set. path is used only to name errors, so a caller
+// bases and profiles per name (wholesale) — each profile's extends
+// flattened against the bases accumulated so far, then discarded — a
+// non-empty efforts table replaces the ladder, claude if set. path is
+// used only to name errors, so a caller
 // that must hash and apply the exact same bytes can read the file once
 // and pass the bytes to both. The maps of the cfg argument are never
 // mutated.
