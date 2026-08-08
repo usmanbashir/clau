@@ -48,8 +48,10 @@ values, replacing the default five.
 
 Add a model in one line — `g = "glm-5.2"` — and `g`, `g1`…`g5` all
 resolve (re-run `clau link` and the commands `cg`, `cg1`…`cg5` exist
-too). One line is enough when your backend serves the model; to aim a
-shortcut at a different backend, use a profile — see
+too). A model that shouldn't take effort digits opts out with the
+table form — `k = { model = "kimi", efforts = false }` — and gets
+haiku's guard. One line is enough when your backend serves the
+model; to aim a shortcut at a different backend, use a profile — see
 [Other backends](#other-backends).
 
 ## Profiles
@@ -172,13 +174,17 @@ idea works without fish — or any shell config at all:
 ## Config
 
 `$CLAU_CONFIG` or `${XDG_CONFIG_HOME:-~/.config}/clau/config.toml`.
-Missing file = defaults. `[models]` entries merge over the built-in
-letters, profiles and bases are all yours (none are built in), and a
-non-empty `[efforts]` table replaces the digit ladder wholesale.
-`clau init` writes a fully commented reference config.
+Missing file = defaults. A top-level `claude = "..."` names the
+binary every shortcut execs (default: `claude` on PATH; a profile or
+base can override it per shortcut). `[models]` entries merge over
+the built-in letters, profiles and bases are all yours (none are
+built in), and a non-empty `[efforts]` table replaces the digit
+ladder wholesale. `clau init` writes a fully commented reference
+config.
 
 ## Commands
 
+    clau <token> [args...]            launch a shortcut (same as c <token>)
     clau link [--dir DIR] [--force]   sync shortcut commands (symlinks; .cmd shims on Windows)
     clau unlink [--dir DIR]           remove everything clau created
     clau list [--tokens] [--dir DIR]  every token → what it launches
