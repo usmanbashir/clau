@@ -17,7 +17,7 @@ clau makes the choice the command name:
     c s3 "explain this"  # same grammar, argument style
     c "fix this bug"     # unknown token? passes straight through
 
-![Demo: co5 launches Opus at max effort; clau list shows every shortcut](docs/demo.gif)
+![Demo: co5 launches Opus at max effort; the grouped clau list; clau show details one shortcut](docs/demo.gif)
 
 ## Install
 
