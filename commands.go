@@ -153,6 +153,9 @@ func profileCell(p Profile, pal palette) string {
 // familyStates aggregates link state over a model letter's grammar
 // family (the letter plus its effort digits): linkable when any family
 // token is in the global set, linked when every family command exists.
+// The digits come from the effective ladder, so a project [efforts]
+// replacement leaves the badge conservative: it can warn about family
+// commands the global-only `clau link` will never create.
 func familyStates(letter string, spec ModelSpec, vc viewContext) (linkable, linked bool) {
 	toks := []string{letter}
 	if spec.Efforts {
@@ -387,7 +390,7 @@ func showView(vc viewContext, arg string) ([]string, error) {
 	case vc.globalTokens[token]:
 		out = append(out, row("linked", "no "+pal.yellow+"— run clau link"+pal.reset))
 	default:
-		out = append(out, row("linked", "no "+pal.dim+"— project profiles launch as c "+token+pal.reset))
+		out = append(out, row("linked", "no "+pal.dim+"— project shortcuts launch as c "+token+pal.reset))
 	}
 
 	target := vc.cfg.Claude

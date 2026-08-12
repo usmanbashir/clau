@@ -150,11 +150,12 @@ allow it once:
     clau trust           # allow it (re-asks whenever the file changes)
 
 Untrusted or changed files are a hard error at launch — never silently
-applied. `clau list`, `clau show`, and `clau doctor` still work untrusted
-and show that a project file is present. Project-only profiles stay
-argument-style (`c deploy`); `clau link` links global tokens only, and
-a linked global command like `crev` picks up the project's override
-automatically. `CLAU_NO_PROJECT=1` skips the layer entirely.
+applied. `clau list`, `clau show`, and `clau doctor` still work
+untrusted; `list` and `doctor` show that a project file is present.
+Project-only profiles stay argument-style (`c deploy`); `clau link`
+links global tokens only, and a linked global command like `crev`
+picks up the project's override automatically. `CLAU_NO_PROJECT=1`
+skips the layer entirely.
 
 ## Why not shell aliases?
 

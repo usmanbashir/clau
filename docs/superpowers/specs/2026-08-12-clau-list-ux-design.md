@@ -157,7 +157,8 @@ Line rules:
   `project (<.clau.toml path>)`, per `tokenSource`.
 - **linked** — `yes → <path>` when `isOwned`; else `no` plus, for
   linkable tokens, yellow `— run clau link`, and for project-only
-  tokens, dim `— project profiles launch as c <token>`.
+  tokens, dim `— project shortcuts launch as c <token>` (they may be
+  profiles or grammar tokens of project model letters).
 - **launches** — resolved binary + flags (`resolveToken` output, the
   old `previewFor` body minus env). No manual wrapping; the terminal
   wraps and the line stays copy-pasteable.

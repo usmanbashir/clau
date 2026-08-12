@@ -543,7 +543,7 @@ func TestShowViewProjectSourceAndLinked(t *testing.T) {
 	if !strings.Contains(out, "source    project (/repo/.clau.toml)") {
 		t.Errorf("project source missing:\n%s", out)
 	}
-	if !strings.Contains(out, "project profiles launch as c gem") {
+	if !strings.Contains(out, "project shortcuts launch as c gem") {
 		t.Errorf("project-only linked hint missing:\n%s", out)
 	}
 
