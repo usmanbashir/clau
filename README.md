@@ -150,8 +150,8 @@ allow it once:
     clau trust           # allow it (re-asks whenever the file changes)
 
 Untrusted or changed files are a hard error at launch — never silently
-applied. `clau list` and `clau doctor` still work untrusted and show
-that a project file is present. Project-only profiles stay
+applied. `clau list`, `clau show`, and `clau doctor` still work untrusted
+and show that a project file is present. Project-only profiles stay
 argument-style (`c deploy`); `clau link` links global tokens only, and
 a linked global command like `crev` picks up the project's override
 automatically. `CLAU_NO_PROJECT=1` skips the layer entirely.
@@ -187,7 +187,8 @@ config.
     clau <token> [args...]            launch a shortcut (same as c <token>)
     clau link [--dir DIR] [--force]   sync shortcut commands (symlinks; .cmd shims on Windows)
     clau unlink [--dir DIR]           remove everything clau created
-    clau list [--tokens] [--dir DIR]  every token → what it launches
+    clau list [--tokens] [--dir DIR]  every shortcut at a glance, grouped
+    clau show <token> [--dir DIR]     everything about one shortcut
     clau run <token> [args...]        explicit launcher (errors on unknown token)
     clau init [--force]               write a starter config
     clau trust [--show]               allow (or print) the project .clau.toml
