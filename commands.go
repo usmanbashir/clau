@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"text/tabwriter"
 )
 
 func sortedKeys[V any](m map[string]V) []string {
@@ -73,32 +72,6 @@ func tokensOf(cfg Config) []string {
 	}
 	sort.Strings(tokens)
 	return tokens
-}
-
-type listRow struct {
-	Token, Command, Linked, Source, Preview string
-}
-
-func previewFor(cfg Config, token string) string {
-	res, found, err := resolveToken(cfg, token)
-	if err != nil || !found {
-		return "(unresolvable)"
-	}
-	target := cfg.Claude
-	if res.Claude != "" {
-		target = res.Claude
-	}
-	parts := append([]string{target}, res.Flags...)
-	preview := strings.Join(parts, " ")
-	if len(res.Env) > 0 {
-		keys := make([]string, 0, len(res.Env))
-		for k := range res.Env {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		preview += " [env: " + strings.Join(keys, ", ") + "]"
-	}
-	return preview
 }
 
 // tokenSource reports where a token's effective definition comes from:
@@ -323,23 +296,6 @@ func listView(vc viewContext) []string {
 	return out
 }
 
-func listRows(cfg Config, dir, clauPath, goos string, projModels, projProfiles map[string]bool) []listRow {
-	var rows []listRow
-	for _, token := range tokensOf(cfg) {
-		command := "c" + token
-		linked := "no"
-		if isOwned(filepath.Join(dir, linkFileName(command, goos)), clauPath) {
-			linked = "yes"
-		}
-		rows = append(rows, listRow{
-			Token: token, Command: command, Linked: linked,
-			Source:  tokenSource(token, projModels, projProfiles),
-			Preview: previewFor(cfg, token),
-		})
-	}
-	return rows
-}
-
 func cmdList(args []string) {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
 	tokens := fs.Bool("tokens", false, "print bare tokens only")
@@ -359,38 +315,33 @@ func cmdList(args []string) {
 		}
 		return
 	}
-	var projModels, projProfiles map[string]bool
-	if st.Path != "" {
-		state := "trusted"
-		switch {
-		case st.Changed:
-			state = "changed, NOT applied — run `clau trust` to re-allow"
-		case !st.Trusted:
-			state = "NOT trusted, NOT applied — run `clau trust`"
-		}
-		fmt.Printf("project: %s (%s)\n", st.Path, state)
-		if st.Applied {
-			projModels, projProfiles, _ = projectDeclarations(st.Path)
-		}
+	for _, line := range listView(newViewContext(cfg, st, *dir)) {
+		fmt.Println(line)
 	}
-	clauPath, err := clauExecutable()
-	if err != nil {
-		clauPath = ""
+}
+
+// newViewContext assembles the renderer inputs from the loaded config
+// and the live environment (TTY, links, project declarations).
+func newViewContext(cfg Config, st ProjectStatus, dir string) viewContext {
+	vc := viewContext{
+		cfg: cfg, st: st, globalPath: configPath(), dir: dir, goos: runtime.GOOS,
+		pal: newPalette(colorChoice(stdoutIsTTY(), runtime.GOOS, os.Getenv)),
 	}
-	w := tabwriter.NewWriter(os.Stdout, 2, 4, 2, ' ', 0)
+	if p, err := clauExecutable(); err == nil {
+		vc.clauPath = p
+	}
+	globalCfg := cfg
 	if st.Applied {
-		fmt.Fprintln(w, "TOKEN\tCOMMAND\tLINKED\tSOURCE\tLAUNCHES")
-	} else {
-		fmt.Fprintln(w, "TOKEN\tCOMMAND\tLINKED\tLAUNCHES")
-	}
-	for _, r := range listRows(cfg, *dir, clauPath, runtime.GOOS, projModels, projProfiles) {
-		if st.Applied {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Token, r.Command, r.Linked, r.Source, r.Preview)
-		} else {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.Token, r.Command, r.Linked, r.Preview)
+		if g, err := loadConfig(configPath()); err == nil {
+			globalCfg = g
 		}
+		vc.projModels, vc.projProfiles, _ = projectDeclarations(st.Path)
 	}
-	w.Flush()
+	vc.globalTokens = map[string]bool{}
+	for _, t := range tokensOf(globalCfg) {
+		vc.globalTokens[t] = true
+	}
+	return vc
 }
 
 const starterConfig = `# clau configuration — https://github.com/usmanbashir/clau

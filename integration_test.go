@@ -415,13 +415,12 @@ func TestIntegrationListShowsProvenance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list untrusted: %v\n%s", err, out)
 	}
-	// The default h model row always contains "haiku", so assert on the
-	// rev row specifically, not on the whole output.
-	if !strings.Contains(out, "NOT trusted") || strings.Contains(out, "SOURCE") {
+	// Untrusted: loud banner, global shape only — no project badge anywhere.
+	if !strings.Contains(out, "NOT trusted") || strings.Contains(out, "project ·") {
 		t.Errorf("untrusted list must warn and stay in the global shape:\n%s", out)
 	}
 	if line := lineContaining(out, "rev"); !strings.Contains(line, "opus") {
-		t.Errorf("untrusted rev row must show the global launch:\n%s", out)
+		t.Errorf("untrusted rev row must show the global model:\n%s", out)
 	}
 
 	seedTrust(t, state, proj)
@@ -429,11 +428,11 @@ func TestIntegrationListShowsProvenance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list trusted: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "SOURCE") {
-		t.Errorf("trusted list must show the SOURCE column:\n%s", out)
-	}
 	if line := lineContaining(out, "rev"); !strings.Contains(line, "haiku") || !strings.Contains(line, "project") {
-		t.Errorf("trusted rev row must show the project override and source:\n%s", out)
+		t.Errorf("trusted rev row must show the project override and badge:\n%s", out)
+	}
+	if !strings.Contains(out, "MODELS") {
+		t.Errorf("list must render the sectioned view:\n%s", out)
 	}
 }
 

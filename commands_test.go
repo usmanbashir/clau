@@ -48,25 +48,6 @@ func TestDoctorShadowWarningsSorted(t *testing.T) {
 	}
 }
 
-func TestListRows(t *testing.T) {
-	cfg := defaultConfig()
-	cfg.Profiles["work"] = Profile{Env: map[string]string{"B": "2", "A": "1"}}
-	rows := listRows(cfg, t.TempDir(), "/nonexistent/clau", "linux", nil, nil)
-	byToken := map[string]listRow{}
-	for _, r := range rows {
-		byToken[r.Token] = r
-	}
-	if r := byToken["o5"]; r.Command != "co5" || r.Preview != "claude --model opus --effort max" || r.Linked != "no" {
-		t.Errorf("o5 row = %+v", r)
-	}
-	if r := byToken["work"]; r.Preview != "claude [env: A, B]" {
-		t.Errorf("work row = %+v", r)
-	}
-	if _, ok := byToken["h3"]; ok {
-		t.Error("h3 must not be listed (efforts=false)")
-	}
-}
-
 func TestDoctorFindings(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.Claude = "definitely-not-a-real-binary-xyz"
@@ -135,23 +116,6 @@ func TestTokenSource(t *testing.T) {
 	}
 	if got := tokenSource("rev", nil, nil); got != "global" {
 		t.Errorf("nil maps must mean global, got %q", got)
-	}
-}
-
-func TestListRowsSource(t *testing.T) {
-	cfg := defaultConfig()
-	cfg.Profiles["rev"] = Profile{Model: "haiku"}
-	rows := listRows(cfg, t.TempDir(), "/nonexistent/clau", "linux",
-		nil, map[string]bool{"rev": true})
-	byToken := map[string]listRow{}
-	for _, r := range rows {
-		byToken[r.Token] = r
-	}
-	if byToken["rev"].Source != "project" {
-		t.Errorf("rev row = %+v", byToken["rev"])
-	}
-	if byToken["o5"].Source != "global" {
-		t.Errorf("o5 row = %+v", byToken["o5"])
 	}
 }
 
