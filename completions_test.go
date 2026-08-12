@@ -31,3 +31,15 @@ func TestCompletionsIncludeTrustVerbs(t *testing.T) {
 		}
 	}
 }
+
+func TestCompletionsIncludeShow(t *testing.T) {
+	for _, shell := range []string{"fish", "zsh", "bash"} {
+		s, err := completionScript(shell)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(s, "show") {
+			t.Errorf("%s completions missing the show verb", shell)
+		}
+	}
+}
