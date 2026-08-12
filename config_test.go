@@ -430,3 +430,61 @@ model = "qwen3.6:27b"
 		t.Errorf("project child must see the project's base: %q", got)
 	}
 }
+
+func TestLoadConfigRecordsExtendsProvenance(t *testing.T) {
+	p := writeConfig(t, `
+[bases.ollama]
+flags = ["--bare"]
+
+[profiles.gem]
+extends = "ollama"
+model = "gemma4:12b"
+
+[profiles.solo]
+model = "opus"
+`)
+	cfg, err := loadConfig(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Profiles["gem"].Extends; got != "ollama" {
+		t.Errorf("gem.Extends = %q, want \"ollama\"", got)
+	}
+	if got := cfg.Profiles["solo"].Extends; got != "" {
+		t.Errorf("solo.Extends = %q, want empty", got)
+	}
+	if got := cfg.Bases["ollama"].Extends; got != "" {
+		t.Errorf("bases must never carry provenance, got %q", got)
+	}
+}
+
+func TestLayeringResetsExtendsProvenance(t *testing.T) {
+	global := writeConfig(t, `
+[bases.ollama]
+flags = ["--bare"]
+
+[profiles.gem]
+extends = "ollama"
+model = "gemma4:12b"
+`)
+	cfg, err := loadConfig(global)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Project file replaces gem wholesale without extends: provenance clears.
+	cfg, err = applyConfigData(cfg, "proj", []byte("[profiles.gem]\nmodel = \"other\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Profiles["gem"].Extends; got != "" {
+		t.Errorf("wholesale replace must reset Extends, got %q", got)
+	}
+	// A project profile extending a global base records it.
+	cfg, err = applyConfigData(cfg, "proj2", []byte("[profiles.p2]\nextends = \"ollama\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Profiles["p2"].Extends; got != "ollama" {
+		t.Errorf("project profile extending global base: Extends = %q", got)
+	}
+}

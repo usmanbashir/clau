@@ -22,6 +22,9 @@ type Profile struct {
 	Flags  []string
 	Env    map[string]string
 	Claude string
+	// Extends records the [bases] name this profile was flattened
+	// against — display provenance only; resolution never reads it.
+	Extends string
 }
 
 type Config struct {
@@ -248,6 +251,7 @@ func applyConfigData(cfg Config, path string, data []byte) (Config, error) {
 				return Config{}, fmt.Errorf("%s: profile %q: extends unknown base %q", path, name, parent)
 			}
 			p = flattenProfile(base, p)
+			p.Extends = parent
 		}
 		cfg.Profiles[name] = p
 	}
