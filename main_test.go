@@ -50,6 +50,7 @@ func TestDispatch(t *testing.T) {
 		{"clau", []string{"--version"}, action{kind: "management", verb: "version", args: []string{}}},
 		{"clau", []string{"trust", "--show"}, action{kind: "management", verb: "trust", args: []string{"--show"}}},
 		{"clau", []string{"untrust"}, action{kind: "management", verb: "untrust", args: []string{}}},
+		{"clau", []string{"show", "o5"}, action{kind: "management", verb: "show", args: []string{"o5"}}},
 		{"c", []string{"-c"}, action{kind: "launch", args: []string{"-c"}}},
 		{"c", []string{}, action{kind: "launch", args: []string{}}},
 		{"co5", []string{"x"}, action{kind: "named", token: "o5", args: []string{"x"}}},

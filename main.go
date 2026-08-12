@@ -26,7 +26,7 @@ func versionString() string {
 }
 
 var reservedVerbs = map[string]bool{
-	"link": true, "unlink": true, "list": true, "run": true,
+	"link": true, "unlink": true, "list": true, "show": true, "run": true,
 	"init": true, "trust": true, "untrust": true,
 	"doctor": true, "completions": true,
 	"version": true, "help": true, "__launch": true,
@@ -161,6 +161,8 @@ func runManagement(verb string, args []string) {
 		cmdUnlink(args)
 	case "list":
 		cmdList(args)
+	case "show":
+		cmdShow(args)
 	case "run":
 		cmdRun(args)
 	case "__launch":
@@ -260,7 +262,8 @@ Usage:
 Management (clau only):
   clau link [--dir DIR] [--force]  sync shortcut commands (symlinks/shims)
   clau unlink [--dir DIR]          remove clau-owned commands
-  clau list [--tokens] [--dir DIR] show tokens, commands, and launches
+  clau list [--tokens] [--dir DIR] every shortcut at a glance, grouped
+  clau show <token> [--dir DIR]    everything about one shortcut
   clau run <token> [args...]       explicit launcher (errors on unknown token)
   clau init [--force]              write a starter config
   clau trust [--show]              allow (or print) the project .clau.toml

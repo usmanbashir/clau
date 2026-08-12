@@ -434,6 +434,30 @@ func cmdList(args []string) {
 	}
 }
 
+func cmdShow(args []string) {
+	fs := flag.NewFlagSet("show", flag.ExitOnError)
+	dir := fs.String("dir", defaultLinkDir(), "directory checked for links")
+	fs.Parse(args)
+	if fs.NArg() != 1 {
+		fatal("usage: clau show <token> [--dir DIR]")
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "."
+	}
+	cfg, st, err := loadEffectiveConfig(cwd, false)
+	if err != nil {
+		fatal("%v", err)
+	}
+	lines, err := showView(newViewContext(cfg, st, *dir), fs.Arg(0))
+	if err != nil {
+		fatal("%v", err)
+	}
+	for _, l := range lines {
+		fmt.Println(l)
+	}
+}
+
 // newViewContext assembles the renderer inputs from the loaded config
 // and the live environment (TTY, links, project declarations).
 func newViewContext(cfg Config, st ProjectStatus, dir string) viewContext {
