@@ -118,6 +118,87 @@ func tokenSource(token string, projModels, projProfiles map[string]bool) string 
 	return "global"
 }
 
+// viewContext carries everything the list and show renderers need,
+// assembled once per command so the renderers stay pure and testable.
+type viewContext struct {
+	cfg          Config
+	st           ProjectStatus
+	globalPath   string // loaded global config path (show's source line)
+	dir          string // link dir being inspected
+	clauPath     string // this binary for isOwned ("" if unknown)
+	goos         string
+	projModels   map[string]bool // model letters the project file declares
+	projProfiles map[string]bool // profile names the project file declares
+	globalTokens map[string]bool // tokens `clau link` would create (global set)
+	pal          palette
+}
+
+func (vc viewContext) linked(token string) bool {
+	return isOwned(filepath.Join(vc.dir, linkFileName("c"+token, vc.goos)), vc.clauPath)
+}
+
+// joinBadges dim-joins non-empty annotation parts with " · ".
+func joinBadges(pal palette, parts ...string) string {
+	var kept []string
+	for _, p := range parts {
+		if p != "" {
+			kept = append(kept, p)
+		}
+	}
+	return strings.Join(kept, pal.dim+" · "+pal.reset)
+}
+
+// rowBadges renders the annotations after a row's model cell. Missing
+// links are a yellow warning only when `clau link` could fix them;
+// project-only tokens get the argument-style launch hint instead.
+func rowBadges(token string, project, linkable, linked bool, pal palette) string {
+	var parts []string
+	if project {
+		parts = append(parts, pal.dim+"project"+pal.reset)
+	}
+	if !linked {
+		if linkable {
+			parts = append(parts, pal.yellow+"not linked — run clau link"+pal.reset)
+		} else {
+			parts = append(parts, pal.dim+"c "+token+pal.reset)
+		}
+	}
+	return joinBadges(pal, parts...)
+}
+
+// profileCell is the middle column of a profile row: the recall anchor.
+func profileCell(p Profile, pal palette) string {
+	switch {
+	case p.Model == "":
+		return pal.dim + "(env/flags)" + pal.reset
+	case p.Effort != "":
+		return p.Model + " " + pal.dim + "(" + p.Effort + ")" + pal.reset
+	}
+	return p.Model
+}
+
+// familyStates aggregates link state over a model letter's grammar
+// family (the letter plus its effort digits): linkable when any family
+// token is in the global set, linked when every family command exists.
+func familyStates(letter string, spec ModelSpec, vc viewContext) (linkable, linked bool) {
+	toks := []string{letter}
+	if spec.Efforts {
+		for _, d := range sortedKeys(vc.cfg.Efforts) {
+			toks = append(toks, letter+d)
+		}
+	}
+	linked = true
+	for _, t := range toks {
+		if vc.globalTokens[t] {
+			linkable = true
+		}
+		if !vc.linked(t) {
+			linked = false
+		}
+	}
+	return linkable, linked
+}
+
 func listRows(cfg Config, dir, clauPath, goos string, projModels, projProfiles map[string]bool) []listRow {
 	var rows []listRow
 	for _, token := range tokensOf(cfg) {

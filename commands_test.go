@@ -246,3 +246,73 @@ func TestDigitSpan(t *testing.T) {
 		t.Errorf("single span = %q", got)
 	}
 }
+
+func TestRowBadges(t *testing.T) {
+	pal := palette{} // plain: rules readable as bytes
+	cases := []struct {
+		name                      string
+		project, linkable, linked bool
+		want                      string
+	}{
+		{"linked global", false, true, true, ""},
+		{"unlinked global", false, true, false, "not linked — run clau link"},
+		{"project linked", true, true, true, "project"},
+		{"project only unlinked", true, false, false, "project · c gma"},
+		{"unlinkable unlinked", false, false, false, "c gma"},
+	}
+	for _, c := range cases {
+		if got := rowBadges("gma", c.project, c.linkable, c.linked, pal); got != c.want {
+			t.Errorf("%s: badges = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestProfileCell(t *testing.T) {
+	pal := palette{}
+	if got := profileCell(Profile{Model: "opus"}, pal); got != "opus" {
+		t.Errorf("model cell = %q", got)
+	}
+	if got := profileCell(Profile{Model: "opus", Effort: "high"}, pal); got != "opus (high)" {
+		t.Errorf("effort-pinned cell = %q", got)
+	}
+	if got := profileCell(Profile{Env: map[string]string{"A": "1"}}, pal); got != "(env/flags)" {
+		t.Errorf("model-less cell = %q", got)
+	}
+}
+
+func TestFamilyStates(t *testing.T) {
+	cfg := defaultConfig()
+	dir := t.TempDir()
+	clauPath := "/nonexistent/clau"
+	vc := viewContext{cfg: cfg, dir: dir, clauPath: clauPath, goos: "linux",
+		globalTokens: map[string]bool{}}
+	for _, tok := range tokensOf(cfg) {
+		vc.globalTokens[tok] = true
+	}
+
+	// Nothing linked yet: linkable but not linked.
+	linkable, linked := familyStates("o", cfg.Models["o"], vc)
+	if !linkable || linked {
+		t.Errorf("unlinked family: linkable=%v linked=%v, want true false", linkable, linked)
+	}
+
+	// Link the whole o family: co, co1..co5.
+	for _, tok := range []string{"o", "o1", "o2", "o3", "o4", "o5"} {
+		if err := os.Symlink(clauPath, filepath.Join(dir, "c"+tok)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	linkable, linked = familyStates("o", cfg.Models["o"], vc)
+	if !linkable || !linked {
+		t.Errorf("linked family: linkable=%v linked=%v, want true true", linkable, linked)
+	}
+
+	// A project-declared letter is not linkable and not linked.
+	vc2 := vc
+	vc2.globalTokens = map[string]bool{}
+	linkable, linked = familyStates("o", cfg.Models["o"], vc2)
+	if linkable {
+		t.Errorf("project family must not be linkable")
+	}
+	_ = linked // linked=true here (symlinks exist) is acceptable: badge shows nothing extra
+}
