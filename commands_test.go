@@ -316,3 +316,148 @@ func TestFamilyStates(t *testing.T) {
 	}
 	_ = linked // linked=true here (symlinks exist) is acceptable: badge shows nothing extra
 }
+
+// plainListVC builds a no-color viewContext over cfg with nothing linked.
+func plainListVC(t *testing.T, cfg Config) viewContext {
+	t.Helper()
+	vc := viewContext{cfg: cfg, dir: t.TempDir(), clauPath: "/nonexistent/clau",
+		goos: "linux", globalTokens: map[string]bool{}, globalPath: "/g/config.toml"}
+	for _, tok := range tokensOf(cfg) {
+		vc.globalTokens[tok] = true
+	}
+	return vc
+}
+
+func lineWith(t *testing.T, lines []string, sub string) string {
+	t.Helper()
+	for _, l := range lines {
+		if strings.Contains(l, sub) {
+			return l
+		}
+	}
+	t.Fatalf("no line contains %q in:\n%s", sub, strings.Join(lines, "\n"))
+	return ""
+}
+
+func lineIndex(lines []string, sub string) int {
+	for i, l := range lines {
+		if strings.Contains(l, sub) {
+			return i
+		}
+	}
+	return -1
+}
+
+func TestRenderSectionAlignment(t *testing.T) {
+	rows := []listRowV{
+		{token: "g12", cell: "gemma4:12b"},
+		{token: "qw35f", cell: "q", badges: "B"},
+	}
+	lines := renderSection("H", rows, palette{})
+	want := []string{
+		"H",
+		"  g12    gemma4:12b",
+		"  qw35f  q            B",
+	}
+	for i, w := range want {
+		if lines[i] != w {
+			t.Errorf("line %d = %q, want %q", i, lines[i], w)
+		}
+	}
+}
+
+func TestListViewSectionsAndOrder(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Bases["ollama"] = Profile{Flags: []string{"--bare"}}
+	cfg.Profiles["gem"] = Profile{Model: "gemma4:12b", Extends: "ollama"}
+	cfg.Profiles["work"] = Profile{Env: map[string]string{"A": "1"}}
+	lines := listView(plainListVC(t, cfg))
+
+	models := lineIndex(lines, "MODELS")
+	ollama := lineIndex(lines, "OLLAMA  base")
+	profiles := lineIndex(lines, "PROFILES")
+	footer := lineIndex(lines, "details: clau show <token>")
+	if models == -1 || !(models < ollama && ollama < profiles && profiles < footer) {
+		t.Fatalf("section order wrong (MODELS=%d OLLAMA=%d PROFILES=%d footer=%d):\n%s",
+			models, ollama, profiles, footer, strings.Join(lines, "\n"))
+	}
+	if !strings.Contains(lines[models], "letter alone = model, +digit 1-5 = effort low..max") {
+		t.Errorf("MODELS header missing legend: %q", lines[models])
+	}
+	if l := lineWith(t, lines, "haiku"); !strings.Contains(l, "no effort digits") {
+		t.Errorf("h row missing efforts note: %q", l)
+	}
+	if l := lineWith(t, lines, "gem"); !strings.Contains(l, "gemma4:12b") {
+		t.Errorf("gem row = %q", l)
+	}
+	if l := lineWith(t, lines, "work"); !strings.Contains(l, "(env/flags)") {
+		t.Errorf("work row = %q", l)
+	}
+	if gem := lineIndex(lines, "gem"); !(ollama < gem && gem < profiles) {
+		t.Errorf("gem must sit inside the OLLAMA section")
+	}
+}
+
+func TestListViewProjectHeaderAndBadges(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Profiles["gma"] = Profile{Model: "gemma4:12b"}
+	vc := plainListVC(t, cfg)
+	delete(vc.globalTokens, "gma") // project-only profile
+	vc.st = ProjectStatus{Path: "/repo/.clau.toml", Trusted: true, Applied: true}
+	vc.projProfiles = map[string]bool{"gma": true}
+	lines := listView(vc)
+
+	if lines[0] != "project: /repo/.clau.toml (trusted)" {
+		t.Errorf("header = %q", lines[0])
+	}
+	if l := lineWith(t, lines, "gma"); !strings.Contains(l, "project · c gma") {
+		t.Errorf("gma badges = %q, want project · c gma", l)
+	}
+	if l := lineWith(t, lines, "opus"); !strings.Contains(l, "not linked — run clau link") {
+		t.Errorf("unlinked model row must warn: %q", l)
+	}
+}
+
+func TestListViewUntrustedHeader(t *testing.T) {
+	cfg := defaultConfig()
+	vc := plainListVC(t, cfg)
+	vc.st = ProjectStatus{Path: "/repo/.clau.toml"}
+	lines := listView(vc)
+	if !strings.Contains(lines[0], "NOT trusted, NOT applied — run `clau trust`") {
+		t.Errorf("untrusted header = %q", lines[0])
+	}
+}
+
+func TestFooterLine(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Profiles["gma"] = Profile{Model: "g"}
+	vc := plainListVC(t, cfg)
+	delete(vc.globalTokens, "gma")
+
+	// 19 global grammar tokens, none linked.
+	if got := footerLine(vc); got != "0 of 19 commands linked in "+contractHome(vc.dir)+" — run clau link · 1 project-only · details: clau show <token>" {
+		t.Errorf("unlinked footer = %q", got)
+	}
+
+	for tok := range vc.globalTokens {
+		if err := os.Symlink(vc.clauPath, filepath.Join(vc.dir, "c"+tok)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := footerLine(vc); got != "all 19 commands linked in "+contractHome(vc.dir)+" · 1 project-only · details: clau show <token>" {
+		t.Errorf("linked footer = %q", got)
+	}
+}
+
+func TestListViewColorSmoke(t *testing.T) {
+	vc := plainListVC(t, defaultConfig())
+	vc.pal = newPalette(true)
+	out := strings.Join(listView(vc), "\n")
+	if !strings.Contains(out, "\033[1;36mo") {
+		t.Errorf("tokens must be cyan when color is on:\n%q", out)
+	}
+	plain := strings.Join(listView(plainListVC(t, defaultConfig())), "\n")
+	if strings.Contains(plain, "\033[") {
+		t.Errorf("plain palette must emit no escapes:\n%q", plain)
+	}
+}

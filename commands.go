@@ -199,6 +199,130 @@ func familyStates(letter string, spec ModelSpec, vc viewContext) (linkable, link
 	return linkable, linked
 }
 
+// listRowV is one row of the sectioned list: token, recall cell, badges.
+type listRowV struct{ token, cell, badges string }
+
+// renderSection aligns a section's rows by visible width (ANSI codes in
+// cells make tabwriter miscount, so padding is manual).
+func renderSection(header string, rows []listRowV, pal palette) []string {
+	lines := []string{header}
+	tokW, cellW := 0, 0
+	for _, r := range rows {
+		if n := visibleLen(r.token); n > tokW {
+			tokW = n
+		}
+		if n := visibleLen(r.cell); n > cellW {
+			cellW = n
+		}
+	}
+	for _, r := range rows {
+		line := "  " + padCell(pal.cyan+r.token+pal.reset, tokW) + "  " +
+			padCell(r.cell, cellW) + "   " + r.badges
+		lines = append(lines, strings.TrimRight(line, " "))
+	}
+	return lines
+}
+
+// footerLine summarizes link health: linkable commands are the global
+// token set (what `clau link` manages); the rest are project-only.
+func footerLine(vc viewContext) string {
+	linkable, linked, projectOnly := 0, 0, 0
+	for _, t := range tokensOf(vc.cfg) {
+		if vc.globalTokens[t] {
+			linkable++
+			if vc.linked(t) {
+				linked++
+			}
+		} else {
+			projectOnly++
+		}
+	}
+	dir := contractHome(vc.dir)
+	var b strings.Builder
+	if linked == linkable {
+		b.WriteString(vc.pal.dim + fmt.Sprintf("all %d commands linked in %s", linkable, dir) + vc.pal.reset)
+	} else {
+		b.WriteString(vc.pal.yellow + fmt.Sprintf("%d of %d commands linked in %s — run clau link", linked, linkable, dir) + vc.pal.reset)
+	}
+	if projectOnly > 0 {
+		b.WriteString(vc.pal.dim + fmt.Sprintf(" · %d project-only", projectOnly) + vc.pal.reset)
+	}
+	b.WriteString(vc.pal.dim + " · details: clau show <token>" + vc.pal.reset)
+	return b.String()
+}
+
+// listView renders the whole sectioned list as lines.
+func listView(vc viewContext) []string {
+	pal := vc.pal
+	var out []string
+
+	if vc.st.Path != "" {
+		state := pal.green + "(trusted)" + pal.reset
+		switch {
+		case vc.st.Changed:
+			state = pal.bold + pal.yellow + "(changed, NOT applied — run `clau trust` to re-allow)" + pal.reset
+		case !vc.st.Trusted:
+			state = pal.bold + pal.yellow + "(NOT trusted, NOT applied — run `clau trust`)" + pal.reset
+		}
+		out = append(out, "project: "+vc.st.Path+" "+state, "")
+	}
+
+	var mrows []listRowV
+	for _, letter := range sortedKeys(vc.cfg.Models) {
+		spec := vc.cfg.Models[letter]
+		linkable, linked := familyStates(letter, spec, vc)
+		note := ""
+		if !spec.Efforts {
+			note = pal.dim + "no effort digits" + pal.reset
+		}
+		badges := joinBadges(pal, note,
+			rowBadges(letter, vc.projModels[letter], linkable, linked, pal))
+		mrows = append(mrows, listRowV{token: letter, cell: spec.Model, badges: badges})
+	}
+	header := pal.bold + "MODELS" + pal.reset + "    " +
+		pal.dim + effortsLegend(vc.cfg.Efforts) + pal.reset
+	out = append(out, renderSection(header, mrows, pal)...)
+
+	groups := map[string][]string{}
+	for name, p := range vc.cfg.Profiles {
+		groups[p.Extends] = append(groups[p.Extends], name)
+	}
+	profileRow := func(name string) listRowV {
+		p := vc.cfg.Profiles[name]
+		return listRowV{
+			token: name,
+			cell:  profileCell(p, pal),
+			badges: rowBadges(name, vc.projProfiles[name],
+				vc.globalTokens[name], vc.linked(name), pal),
+		}
+	}
+	for _, base := range sortedKeys(groups) {
+		if base == "" {
+			continue
+		}
+		sort.Strings(groups[base])
+		var rows []listRowV
+		for _, name := range groups[base] {
+			rows = append(rows, profileRow(name))
+		}
+		header := pal.bold + strings.ToUpper(base) + pal.reset + "  " + pal.dim + "base" + pal.reset
+		out = append(out, "")
+		out = append(out, renderSection(header, rows, pal)...)
+	}
+	if names := groups[""]; len(names) > 0 {
+		sort.Strings(names)
+		var rows []listRowV
+		for _, name := range names {
+			rows = append(rows, profileRow(name))
+		}
+		out = append(out, "")
+		out = append(out, renderSection(pal.bold+"PROFILES"+pal.reset, rows, pal)...)
+	}
+
+	out = append(out, "", footerLine(vc))
+	return out
+}
+
 func listRows(cfg Config, dir, clauPath, goos string, projModels, projProfiles map[string]bool) []listRow {
 	var rows []listRow
 	for _, token := range tokensOf(cfg) {
