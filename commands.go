@@ -12,13 +12,48 @@ import (
 	"text/tabwriter"
 )
 
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// digitSpan renders sorted ladder digits compactly: "1-5" when
+// contiguous, else "1,3,7".
+func digitSpan(digits []string) string {
+	contiguous := len(digits) > 1
+	for i := 1; i < len(digits); i++ {
+		if digits[i][0] != digits[i-1][0]+1 {
+			contiguous = false
+			break
+		}
+	}
+	if contiguous {
+		return digits[0] + "-" + digits[len(digits)-1]
+	}
+	return strings.Join(digits, ",")
+}
+
+// effortsLegend is the MODELS header note that teaches the grammar
+// once, instead of one row per effort token.
+func effortsLegend(efforts map[string]string) string {
+	digits := sortedKeys(efforts)
+	if len(digits) == 0 {
+		return "letter alone = model"
+	}
+	if len(digits) == 1 {
+		return fmt.Sprintf("letter alone = model, +digit %s = effort %s", digits[0], efforts[digits[0]])
+	}
+	return fmt.Sprintf("letter alone = model, +digit %s = effort %s..%s",
+		digitSpan(digits), efforts[digits[0]], efforts[digits[len(digits)-1]])
+}
+
 func tokensOf(cfg Config) []string {
 	var tokens []string
-	digits := make([]string, 0, len(cfg.Efforts))
-	for d := range cfg.Efforts {
-		digits = append(digits, d)
-	}
-	sort.Strings(digits)
+	digits := sortedKeys(cfg.Efforts)
 	for letter, spec := range cfg.Models {
 		tokens = append(tokens, letter)
 		if spec.Efforts {

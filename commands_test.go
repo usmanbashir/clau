@@ -211,3 +211,38 @@ func TestProjectFindingsListsDeclarations(t *testing.T) {
 		t.Errorf("declarations not reported:\n%s", out)
 	}
 }
+
+func TestEffortsLegend(t *testing.T) {
+	cases := []struct {
+		name    string
+		efforts map[string]string
+		want    string
+	}{
+		{"default ladder", defaultConfig().Efforts,
+			"letter alone = model, +digit 1-5 = effort low..max"},
+		{"custom contiguous", map[string]string{"1": "minimal", "2": "peak"},
+			"letter alone = model, +digit 1-2 = effort minimal..peak"},
+		{"non-contiguous", map[string]string{"1": "low", "3": "high", "7": "max"},
+			"letter alone = model, +digit 1,3,7 = effort low..max"},
+		{"single digit", map[string]string{"3": "high"},
+			"letter alone = model, +digit 3 = effort high"},
+		{"empty", map[string]string{}, "letter alone = model"},
+	}
+	for _, c := range cases {
+		if got := effortsLegend(c.efforts); got != c.want {
+			t.Errorf("%s: legend = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestDigitSpan(t *testing.T) {
+	if got := digitSpan([]string{"1", "2", "3"}); got != "1-3" {
+		t.Errorf("contiguous span = %q", got)
+	}
+	if got := digitSpan([]string{"1", "3"}); got != "1,3" {
+		t.Errorf("gapped span = %q", got)
+	}
+	if got := digitSpan([]string{"4"}); got != "4" {
+		t.Errorf("single span = %q", got)
+	}
+}
