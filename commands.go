@@ -296,6 +296,120 @@ func listView(vc viewContext) []string {
 	return out
 }
 
+// maskedEnvName reports whether an env var's value must render masked:
+// any _-separated segment equal to TOKEN, KEY, SECRET, or PASSWORD.
+// Plural segments (TOKENS) stay visible — they are sizes, not secrets.
+func maskedEnvName(name string) bool {
+	for _, seg := range strings.Split(strings.ToUpper(name), "_") {
+		switch seg {
+		case "TOKEN", "KEY", "SECRET", "PASSWORD":
+			return true
+		}
+	}
+	return false
+}
+
+// uniquePrefixMatch returns the single token arg prefixes, or "".
+func uniquePrefixMatch(cfg Config, arg string) string {
+	match := ""
+	for _, t := range tokensOf(cfg) {
+		if strings.HasPrefix(t, arg) {
+			if match != "" {
+				return ""
+			}
+			match = t
+		}
+	}
+	return match
+}
+
+// kindLine explains what shape of shortcut a resolvable token is.
+func kindLine(vc viewContext, token string) string {
+	cfg := vc.cfg
+	if p, ok := cfg.Profiles[token]; ok {
+		if p.Extends != "" {
+			return "profile " + vc.pal.dim + "· extends base: " + p.Extends + vc.pal.reset
+		}
+		return "profile"
+	}
+	if spec, ok := cfg.Models[token]; ok {
+		if !spec.Efforts {
+			return fmt.Sprintf("model letter: %s · no effort digits", spec.Model)
+		}
+		return fmt.Sprintf("model letter: %s · effort digits %s",
+			spec.Model, digitSpan(sortedKeys(cfg.Efforts)))
+	}
+	d := string(token[len(token)-1])
+	letter := token[:len(token)-1]
+	return fmt.Sprintf("grammar: %s (%s) + %s (effort %s)",
+		letter, cfg.Models[letter].Model, d, cfg.Efforts[d])
+}
+
+// showView renders everything about one token. The error message is
+// ready for fatal() verbatim.
+func showView(vc viewContext, arg string) ([]string, error) {
+	pal := vc.pal
+	token := arg
+	res, found, err := resolveToken(vc.cfg, token)
+	if !found && err == nil && len(arg) > 1 && strings.HasPrefix(arg, "c") {
+		if r2, f2, e2 := resolveToken(vc.cfg, arg[1:]); f2 {
+			token, res, found, err = arg[1:], r2, f2, e2
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		msg := fmt.Sprintf("unknown token %q", arg)
+		if hint := uniquePrefixMatch(vc.cfg, arg); hint != "" {
+			msg += fmt.Sprintf(" — did you mean %q?", hint)
+		}
+		return nil, fmt.Errorf("%s; run `clau list` to see every token", msg)
+	}
+
+	row := func(label, value string) string {
+		return fmt.Sprintf("  %-8s  %s", label, value)
+	}
+	out := []string{pal.cyan + token + pal.reset + " → c" + token}
+	out = append(out, row("kind", kindLine(vc, token)))
+
+	src := "global (" + contractHome(vc.globalPath) + ")"
+	if tokenSource(token, vc.projModels, vc.projProfiles) == "project" {
+		src = "project (" + vc.st.Path + ")"
+	}
+	out = append(out, row("source", src))
+
+	command := "c" + token
+	linkPath := filepath.Join(vc.dir, linkFileName(command, vc.goos))
+	switch {
+	case isOwned(linkPath, vc.clauPath):
+		out = append(out, row("linked", "yes → "+contractHome(linkPath)))
+	case vc.globalTokens[token]:
+		out = append(out, row("linked", "no "+pal.yellow+"— run clau link"+pal.reset))
+	default:
+		out = append(out, row("linked", "no "+pal.dim+"— project profiles launch as c "+token+pal.reset))
+	}
+
+	target := vc.cfg.Claude
+	if res.Claude != "" {
+		target = res.Claude
+	}
+	out = append(out, row("launches", strings.Join(append([]string{target}, res.Flags...), " ")))
+
+	for i, k := range sortedKeys(res.Env) {
+		v := res.Env[k]
+		if maskedEnvName(k) {
+			v = "•••"
+		}
+		label := ""
+		if i == 0 {
+			label = "env"
+		}
+		out = append(out, row(label, k+"="+v))
+	}
+	return out, nil
+}
+
 func cmdList(args []string) {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
 	tokens := fs.Bool("tokens", false, "print bare tokens only")

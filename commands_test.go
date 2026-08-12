@@ -425,3 +425,136 @@ func TestListViewColorSmoke(t *testing.T) {
 		t.Errorf("plain palette must emit no escapes:\n%q", plain)
 	}
 }
+
+func TestMaskedEnvName(t *testing.T) {
+	cases := map[string]bool{
+		"ANTHROPIC_AUTH_TOKEN":           true,
+		"OPENAI_API_KEY":                 true,
+		"MY_SECRET":                      true,
+		"DB_PASSWORD":                    true,
+		"anthropic_auth_token":           true,
+		"CLAUDE_CODE_MAX_CONTEXT_TOKENS": false, // segment is TOKENS, not TOKEN
+		"ANTHROPIC_BASE_URL":             false,
+		"MONKEYS":                        false,
+	}
+	for name, want := range cases {
+		if got := maskedEnvName(name); got != want {
+			t.Errorf("maskedEnvName(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
+
+// showVC builds a plain viewContext with one flattened ollama profile.
+func showVC(t *testing.T) viewContext {
+	t.Helper()
+	cfg := defaultConfig()
+	cfg.Bases["ollama"] = Profile{Flags: []string{"--bare"}}
+	cfg.Profiles["gem"] = Profile{
+		Model: "gemma4:12b", Extends: "ollama",
+		Flags: []string{"--bare", "--strict-mcp-config"},
+		Env: map[string]string{
+			"ANTHROPIC_AUTH_TOKEN": "ollama",
+			"ANTHROPIC_BASE_URL":   "http://localhost:11434",
+		},
+	}
+	return plainListVC(t, cfg)
+}
+
+func TestShowViewProfile(t *testing.T) {
+	lines, err := showView(showVC(t), "gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := strings.Join(lines, "\n")
+	for _, want := range []string{
+		"gem → cgem",
+		"kind      profile · extends base: ollama",
+		"source    global (" + contractHome("/g/config.toml") + ")",
+		"linked    no",
+		"launches  claude --model gemma4:12b --bare --strict-mcp-config",
+		"ANTHROPIC_AUTH_TOKEN=•••",
+		"ANTHROPIC_BASE_URL=http://localhost:11434",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "ANTHROPIC_AUTH_TOKEN=ollama") {
+		t.Errorf("auth token value leaked:\n%s", out)
+	}
+}
+
+func TestShowViewKinds(t *testing.T) {
+	vc := showVC(t)
+	cases := map[string]string{
+		"o":  "model letter: opus · effort digits 1-5",
+		"h":  "model letter: haiku · no effort digits",
+		"o3": "grammar: o (opus) + 3 (effort high)",
+	}
+	for token, want := range cases {
+		lines, err := showView(vc, token)
+		if err != nil {
+			t.Fatalf("%s: %v", token, err)
+		}
+		if out := strings.Join(lines, "\n"); !strings.Contains(out, want) {
+			t.Errorf("%s: missing %q in:\n%s", token, want, out)
+		}
+	}
+}
+
+func TestShowViewFallbacksAndErrors(t *testing.T) {
+	vc := showVC(t)
+
+	lines, err := showView(vc, "cgem") // command-name fallback
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(lines, "\n"), "gem → cgem") {
+		t.Errorf("c-prefix fallback failed:\n%s", strings.Join(lines, "\n"))
+	}
+
+	if _, err := showView(vc, "zz"); err == nil ||
+		!strings.Contains(err.Error(), `unknown token "zz"`) ||
+		!strings.Contains(err.Error(), "clau list") {
+		t.Errorf("unknown-token error = %v", err)
+	}
+
+	if _, err := showView(vc, "ge"); err == nil ||
+		!strings.Contains(err.Error(), `did you mean "gem"?`) {
+		t.Errorf("did-you-mean missing: %v", err)
+	}
+
+	if _, err := showView(vc, "h3"); err == nil ||
+		!strings.Contains(err.Error(), "supports no effort levels") {
+		t.Errorf("resolver error must surface: %v", err)
+	}
+}
+
+func TestShowViewProjectSourceAndLinked(t *testing.T) {
+	vc := showVC(t)
+	vc.st = ProjectStatus{Path: "/repo/.clau.toml", Trusted: true, Applied: true}
+	vc.projProfiles = map[string]bool{"gem": true}
+	delete(vc.globalTokens, "gem")
+	lines, err := showView(vc, "gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := strings.Join(lines, "\n")
+	if !strings.Contains(out, "source    project (/repo/.clau.toml)") {
+		t.Errorf("project source missing:\n%s", out)
+	}
+	if !strings.Contains(out, "project profiles launch as c gem") {
+		t.Errorf("project-only linked hint missing:\n%s", out)
+	}
+
+	if err := os.Symlink(vc.clauPath, filepath.Join(vc.dir, "cgem")); err != nil {
+		t.Fatal(err)
+	}
+	lines, err = showView(vc, "gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out := strings.Join(lines, "\n"); !strings.Contains(out, "linked    yes → ") {
+		t.Errorf("linked-yes line missing:\n%s", out)
+	}
+}
