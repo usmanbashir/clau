@@ -14,6 +14,8 @@ archives:
         formats: [zip]
 checksum:
   name_template: checksums.txt
+release:
+  header: "{{ .TagBody }}"
 homebrew_casks:
   - name: clau
     binaries:

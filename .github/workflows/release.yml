@@ -1,3 +1,17 @@
+# Release from an annotated tag:
+#
+#   git tag -a vX.Y.Z
+#   git push origin vX.Y.Z
+#
+# The tag message is a subject line, a blank line, then the release note.
+# The subject stays in git; GoReleaser publishes the note above the
+# generated changelog (release.header in .goreleaser.yaml). Git strips
+# lines starting with # from tag messages, so write headings as **bold**
+# text. --cleanup=verbatim keeps # lines, but in the editor it also keeps
+# git's own # instructions, so pair it with -F <file>.
+#
+# The job refuses a lightweight tag: its .TagBody is the tagged commit's
+# message body, which would go out as the release note.
 name: Release
 on:
   push:
@@ -11,6 +25,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Require an annotated tag
+        run: |
+          git fetch --force --tags
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" != tag ]; then
+            echo "::error::$GITHUB_REF_NAME is not an annotated tag, so its release note would be the commit message. Re-create it with git tag -a."
+            exit 1
+          fi
       - uses: actions/setup-go@v7
         with:
           go-version: stable
