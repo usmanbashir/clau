@@ -436,6 +436,67 @@ func TestIntegrationListShowsProvenance(t *testing.T) {
 	}
 }
 
+// TestIntegrationShowDirEitherSideOfToken guards that `clau show` reads
+// --dir before or after the token, in each spelling the flag package
+// takes. The linked row only says yes when the folder holds this binary's
+// link, so pairing a linked folder with an empty one proves --dir was
+// used, not just accepted.
+func TestIntegrationShowDirEitherSideOfToken(t *testing.T) {
+	bin := buildClau(t)
+	cwd, state := t.TempDir(), t.TempDir()
+	env := []string{"CLAU_NO_PROJECT=1"}
+	linkDir, emptyDir := t.TempDir(), t.TempDir()
+	// --force so a crev elsewhere on PATH can't make link skip it.
+	if out, err, _ := runInProject(t, bin, cwd, projectGlobal, state, env, "link", "--force", "--dir", linkDir); err != nil {
+		t.Fatalf("link: %v\n%s", err, out)
+	}
+
+	layouts := [][]string{
+		{"--dir", "DIR", "rev"},
+		{"--dir=DIR", "rev"},
+		{"-dir", "DIR", "rev"},
+		{"rev", "--dir", "DIR"},
+		{"rev", "--dir=DIR"},
+		{"rev", "-dir", "DIR"},
+	}
+	for _, layout := range layouts {
+		for _, c := range []struct{ dir, want string }{{linkDir, "yes"}, {emptyDir, "no"}} {
+			args := []string{"show"}
+			for _, a := range layout {
+				args = append(args, strings.Replace(a, "DIR", c.dir, 1))
+			}
+			out, err, _ := runInProject(t, bin, cwd, projectGlobal, state, env, args...)
+			if err != nil {
+				t.Errorf("show %s (want %s): %v\n%s", strings.Join(layout, " "), c.want, err, out)
+				continue
+			}
+			if f := strings.Fields(lineContaining(out, "linked")); len(f) < 2 || f[1] != c.want {
+				t.Errorf("show %s: linked row must say %s for %s:\n%s", strings.Join(layout, " "), c.want, c.dir, out)
+			}
+		}
+	}
+}
+
+// TestIntegrationShowNeedsOneToken guards that letting --dir sit on
+// either side of the token still rejects zero tokens or more than one.
+func TestIntegrationShowNeedsOneToken(t *testing.T) {
+	bin := buildClau(t)
+	cwd, state, dir := t.TempDir(), t.TempDir(), t.TempDir()
+	env := []string{"CLAU_NO_PROJECT=1"}
+	for _, args := range [][]string{
+		{"show"},
+		{"show", "--dir", dir},
+		{"show", "rev", "rev"},
+		{"show", "rev", "--dir", dir, "rev"},
+		{"show", "--dir", dir, "rev", "rev"},
+	} {
+		out, err, _ := runInProject(t, bin, cwd, projectGlobal, state, env, args...)
+		if err == nil || !strings.Contains(out, "usage: clau show <token> [--dir DIR]") {
+			t.Errorf("%v: want the usage error, got err=%v:\n%s", args, err, out)
+		}
+	}
+}
+
 // TestIntegrationLinkIgnoresProjectProfiles guards that `clau link` stays
 // global-only: even a trusted project file defining its own profile must
 // not produce a link for it, while global tokens still link normally.
