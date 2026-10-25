@@ -78,6 +78,16 @@ func fatal(format string, a ...any) {
 	os.Exit(1)
 }
 
+// parseFlagsOnly parses a command that takes flags and nothing else.
+// flag stops at the first non-flag, so a stray argument would otherwise
+// drop every flag after it without a word.
+func parseFlagsOnly(fs *flag.FlagSet, args []string, usage string) {
+	fs.Parse(args)
+	if fs.NArg() > 0 {
+		fatal("usage: %s", usage)
+	}
+}
+
 func mustLoadConfig() Config {
 	cfg, err := loadConfig(configPath())
 	if err != nil {
@@ -202,7 +212,7 @@ func cmdLink(args []string) {
 	fs := flag.NewFlagSet("link", flag.ExitOnError)
 	dir := fs.String("dir", defaultLinkDir(), "directory for shortcut commands")
 	force := fs.Bool("force", false, "create even over collisions")
-	fs.Parse(args)
+	parseFlagsOnly(fs, args, "clau link [--dir DIR] [--force]")
 	cfg := mustLoadConfig()
 	clauPath, err := clauExecutable()
 	if err != nil {
@@ -222,7 +232,7 @@ func cmdLink(args []string) {
 func cmdUnlink(args []string) {
 	fs := flag.NewFlagSet("unlink", flag.ExitOnError)
 	dir := fs.String("dir", defaultLinkDir(), "directory for shortcut commands")
-	fs.Parse(args)
+	parseFlagsOnly(fs, args, "clau unlink [--dir DIR]")
 	clauPath, err := clauExecutable()
 	if err != nil {
 		fatal("%v", err)

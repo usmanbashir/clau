@@ -497,6 +497,48 @@ func TestIntegrationShowNeedsOneToken(t *testing.T) {
 	}
 }
 
+// TestIntegrationFlagsOnlyCommandsRejectArgs guards that commands taking
+// only flags refuse a stray argument. flag stops at the first non-flag,
+// so `clau link foo --dir X` used to drop --dir and link into the default
+// folder, and `clau trust foo --show` trusted instead of printing.
+func TestIntegrationFlagsOnlyCommandsRejectArgs(t *testing.T) {
+	bin := buildClau(t)
+	dir, _ := writeProject(t, projectLayer)
+	state, home, linkDir := t.TempDir(), t.TempDir(), t.TempDir()
+	// A temp home keeps the default link folder away from the real one.
+	env := []string{"HOME=" + home, "USERPROFILE=" + home}
+	// Checked after every run, so a later unlink can't hide a link's writes.
+	untouched := []string{filepath.Join(home, ".local", "bin"), linkDir, filepath.Join(state, "clau")}
+	for _, c := range []struct {
+		usage string
+		flags []string
+	}{
+		{"clau link [--dir DIR] [--force]", []string{"--dir", linkDir}},
+		{"clau unlink [--dir DIR]", []string{"--dir", linkDir}},
+		{"clau list [--tokens] [--dir DIR]", []string{"--dir", linkDir}},
+		{"clau doctor [--dir DIR]", []string{"--dir", linkDir}},
+		{"clau init [--force]", []string{"--force"}},
+		{"clau trust [--show]", []string{"--show"}},
+	} {
+		verb := strings.Fields(c.usage)[1]
+		for _, args := range [][]string{
+			{verb, "stray"},
+			append([]string{verb, "stray"}, c.flags...),
+			append(append([]string{verb}, c.flags...), "stray"),
+		} {
+			out, err, _ := runInProject(t, bin, dir, projectGlobal, state, env, args...)
+			if err == nil || !strings.Contains(out, "usage: "+c.usage) {
+				t.Errorf("%v: want the usage error, got err=%v:\n%s", args, err, out)
+			}
+			for _, d := range untouched {
+				if entries, _ := os.ReadDir(d); len(entries) > 0 {
+					t.Errorf("%v wrote to %s", args, d)
+				}
+			}
+		}
+	}
+}
+
 // TestIntegrationLinkIgnoresProjectProfiles guards that `clau link` stays
 // global-only: even a trusted project file defining its own profile must
 // not produce a link for it, while global tokens still link normally.
