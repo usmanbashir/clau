@@ -26,7 +26,7 @@ homebrew_casks:
     description: Launch Claude Code pre-configured in one word
     hooks:
       post:
-        install: |
-          if File.executable?("/usr/bin/xattr")
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/clau"], must_succeed: false
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/clau"], must_succeed: false
           end
