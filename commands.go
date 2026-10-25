@@ -417,7 +417,7 @@ func cmdList(args []string) {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
 	tokens := fs.Bool("tokens", false, "print bare tokens only")
 	dir := fs.String("dir", defaultLinkDir(), "directory checked for links")
-	fs.Parse(args)
+	parseFlagsOnly(fs, args, "clau list [--tokens] [--dir DIR]")
 	cwd, err := os.Getwd()
 	if err != nil {
 		cwd = "."
@@ -572,7 +572,7 @@ h = "haiku"
 func cmdInit(args []string) {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	force := fs.Bool("force", false, "overwrite an existing config")
-	fs.Parse(args)
+	parseFlagsOnly(fs, args, "clau init [--force]")
 	path := configPath()
 	if _, err := os.Stat(path); err == nil && !*force {
 		fatal("%s already exists (use --force to overwrite)", path)
@@ -706,7 +706,7 @@ func projectFindings(st ProjectStatus, store map[string]string, corrupt bool) []
 func cmdDoctor(args []string) {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	dir := fs.String("dir", defaultLinkDir(), "directory checked for links")
-	fs.Parse(args)
+	parseFlagsOnly(fs, args, "clau doctor [--dir DIR]")
 	cfg, cfgErr := loadConfig(configPath())
 	clauPath, err := clauExecutable()
 	if err != nil {
@@ -738,7 +738,7 @@ func cmdDoctor(args []string) {
 func cmdTrust(args []string) {
 	fs := flag.NewFlagSet("trust", flag.ExitOnError)
 	show := fs.Bool("show", false, "print the project config instead of trusting it")
-	fs.Parse(args)
+	parseFlagsOnly(fs, args, "clau trust [--show]")
 	cwd, err := os.Getwd()
 	if err != nil {
 		fatal("%v", err)
