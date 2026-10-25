@@ -41,17 +41,17 @@ PATH, collisions, and links, and says what to fix.
 `<letter><digit>`: the letter picks a model from `[models]` in your
 config, the digit 1–5 picks effort low/medium/high/xhigh/max. Letter
 alone = model only. Built-in letters: `o` opus, `s` sonnet, `f` fable,
-`h` haiku (haiku takes no effort digit — the CLI would silently
-downgrade it, so clau errors instead). The digit ladder is itself
-config: an `[efforts]` table remaps digits `1`–`9` to `--effort`
-values, replacing the default five.
+`h` haiku. The digit ladder is itself config: an `[efforts]` table
+remaps digits `1`–`9` to `--effort` values, replacing the default
+five.
 
 Add a model in one line — `g = "glm-5.2"` — and `g`, `g1`…`g5` all
 resolve (re-run `clau link` and the commands `cg`, `cg1`…`cg5` exist
-too). A model that shouldn't take effort digits opts out with the
-table form — `k = { model = "kimi", efforts = false }` — and gets
-haiku's guard. One line is enough when your backend serves the
-model; to aim a shortcut at a different backend, use a profile — see
+too). A model without effort support opts out with the table form —
+`k = { model = "kimi", efforts = false }` — and clau rejects its
+digits instead of letting Claude Code drop the effort silently. One
+line is enough when your backend serves the model; to aim a shortcut
+at a different backend, use a profile — see
 [Other backends](#other-backends).
 
 ## Profiles

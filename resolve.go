@@ -38,7 +38,8 @@ func resolveToken(cfg Config, token string) (TokenResolution, bool, error) {
 		if inLadder && isModel {
 			if !spec.Efforts {
 				return TokenResolution{}, true,
-					fmt.Errorf("model %q (%s) supports no effort levels", rest, spec.Model)
+					fmt.Errorf("model %q (%s) takes no effort digits: efforts = false is set for %q in [models]",
+						rest, spec.Model, rest)
 			}
 			return TokenResolution{Flags: []string{"--model", spec.Model, "--effort", level}}, true, nil
 		}

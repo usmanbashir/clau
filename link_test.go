@@ -11,12 +11,14 @@ import (
 
 func TestLinkNames(t *testing.T) {
 	cfg := defaultConfig()
+	cfg.Models["k"] = ModelSpec{Model: "kimi"}
 	cfg.Profiles["rev"] = Profile{Model: "opus"}
 	got := linkNames(cfg)
 	want := []string{
 		"c",
 		"cf", "cf1", "cf2", "cf3", "cf4", "cf5",
-		"ch", // efforts=false: no ch1..ch5
+		"ch", "ch1", "ch2", "ch3", "ch4", "ch5",
+		"ck", // efforts=false: no ck1..ck5
 		"co", "co1", "co2", "co3", "co4", "co5",
 		"crev",
 		"cs", "cs1", "cs2", "cs3", "cs4", "cs5",
@@ -62,7 +64,7 @@ func TestSyncLinksCreatesAndPrunes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rep.Created) != 21 || len(rep.Pruned) != 0 {
+	if len(rep.Created) != 26 || len(rep.Pruned) != 0 {
 		t.Fatalf("report = %+v", rep)
 	}
 	if target, err := os.Readlink(filepath.Join(dir, "co5")); err != nil || target != clauPath {
@@ -74,7 +76,7 @@ func TestSyncLinksCreatesAndPrunes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rep.Created) != 0 || len(rep.Kept) != 21 {
+	if len(rep.Created) != 0 || len(rep.Kept) != 26 {
 		t.Fatalf("resync report = %+v", rep)
 	}
 
@@ -208,7 +210,7 @@ func TestRemoveOwned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(removed) != 20 { // linkNames(defaultConfig()) yields 20 names, all owned
+	if len(removed) != 25 { // linkNames(defaultConfig()) yields 25 names, all owned
 		t.Errorf("removed %d: %v", len(removed), removed)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "unrelated")); err != nil {

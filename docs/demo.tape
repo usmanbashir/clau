@@ -3,7 +3,7 @@ Output docs/demo.gif
 Set Shell "fish"
 Set FontSize 20
 Set Width 1200
-Set Height 1200
+Set Height 1260
 Set Framerate 25
 Set TypingSpeed 75ms
 
@@ -29,10 +29,12 @@ Sleep 6s
 Ctrl+C
 Sleep 300ms
 Ctrl+C
+# Hide before claude's exit reaches the shell: the terminal's focus-in
+# report gets echoed as a stray ^[[I there.
+Hide
 Sleep 1.5s
 
 # The freeze-frame: breadth, grouped (fresh screen so the whole list fits)
-Hide
 Type "clear"
 Enter
 Show

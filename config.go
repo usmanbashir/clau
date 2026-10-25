@@ -42,7 +42,7 @@ func defaultConfig() Config {
 			"o": {Model: "opus", Efforts: true},
 			"s": {Model: "sonnet", Efforts: true},
 			"f": {Model: "fable", Efforts: true},
-			"h": {Model: "haiku", Efforts: false},
+			"h": {Model: "haiku", Efforts: true},
 		},
 		Efforts: map[string]string{
 			"1": "low", "2": "medium", "3": "high", "4": "xhigh", "5": "max",
