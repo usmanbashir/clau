@@ -24,8 +24,8 @@ func TestDefaultConfig(t *testing.T) {
 	if got := cfg.Models["o"]; got.Model != "opus" || !got.Efforts {
 		t.Errorf("o = %+v, want opus/efforts", got)
 	}
-	if got := cfg.Models["h"]; got.Model != "haiku" || got.Efforts {
-		t.Errorf("h = %+v, want haiku/no-efforts", got)
+	if got := cfg.Models["h"]; got.Model != "haiku" || !got.Efforts {
+		t.Errorf("h = %+v, want haiku/efforts", got)
 	}
 	if cfg.Efforts["5"] != "max" || cfg.Efforts["1"] != "low" {
 		t.Errorf("ladder = %v", cfg.Efforts)

@@ -496,11 +496,14 @@ const starterConfig = `# clau configuration — https://github.com/usmanbashir/c
 o = "opus"
 s = "sonnet"
 f = "fable"
-h = { model = "haiku", efforts = false }
+h = "haiku"
 # Add your own — one line yields <letter>, <letter>1..5 and, after
 # "clau link", their commands. The model must be one your backend
 # serves; for another backend use a profile (see below).
 #g = "glm-5.2"
+# A model without effort support opts out of the digits — clau then
+# rejects k1..k5 rather than let claude drop the effort silently:
+#k = { model = "kimi", efforts = false }
 
 # The digit ladder is configurable too — a non-empty [efforts] table
 # maps digits 1..9 to --effort values and replaces the default five:

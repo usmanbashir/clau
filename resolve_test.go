@@ -8,6 +8,7 @@ import (
 
 func testConfig() Config {
 	cfg := defaultConfig()
+	cfg.Models["k"] = ModelSpec{Model: "kimi"} // opted out of effort digits
 	cfg.Profiles["rev"] = Profile{
 		Model: "opus", Effort: "high",
 		Flags: []string{"--append-system-prompt", "Review code."},
@@ -32,7 +33,9 @@ func TestResolveToken(t *testing.T) {
 		{"s3", []string{"--model", "sonnet", "--effort", "high"}, true, ""},
 		{"f5", []string{"--model", "fable", "--effort", "max"}, true, ""},
 		{"h", []string{"--model", "haiku"}, true, ""},
-		{"h3", nil, true, "no effort levels"},
+		{"h3", []string{"--model", "haiku", "--effort", "high"}, true, ""},
+		{"k", []string{"--model", "kimi"}, true, ""},
+		{"k3", nil, true, `efforts = false is set for "k" in [models]`},
 		{"o5", []string{"--model", "shadow"}, true, ""}, // profile wins
 		{"rev", []string{"--model", "opus", "--effort", "high", "--append-system-prompt", "Review code."}, true, ""},
 		{"x", nil, false, ""},

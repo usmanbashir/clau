@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -11,9 +12,10 @@ import (
 
 func TestTokensOf(t *testing.T) {
 	cfg := defaultConfig()
+	cfg.Models["k"] = ModelSpec{Model: "kimi"} // efforts=false: no k1..k5
 	cfg.Profiles["rev"] = Profile{Model: "opus"}
 	got := strings.Join(tokensOf(cfg), " ")
-	want := "f f1 f2 f3 f4 f5 h o o1 o2 o3 o4 o5 rev s s1 s2 s3 s4 s5"
+	want := "f f1 f2 f3 f4 f5 h h1 h2 h3 h4 h5 k o o1 o2 o3 o4 o5 rev s s1 s2 s3 s4 s5"
 	if got != want {
 		t.Errorf("tokens = %q\nwant     %q", got, want)
 	}
@@ -94,8 +96,8 @@ func TestStarterConfigIsValidAndInert(t *testing.T) {
 	if len(cfg.Bases) != 0 {
 		t.Errorf("starter config defines active bases: %v (examples must be commented out)", cfg.Bases)
 	}
-	if cfg.Models["o"].Model != "opus" {
-		t.Errorf("starter config changed defaults: %+v", cfg.Models)
+	if !reflect.DeepEqual(cfg.Models, defaultConfig().Models) {
+		t.Errorf("starter config changed default models: %+v", cfg.Models)
 	}
 }
 
@@ -332,6 +334,7 @@ func TestRenderSectionAlignment(t *testing.T) {
 
 func TestListViewSectionsAndOrder(t *testing.T) {
 	cfg := defaultConfig()
+	cfg.Models["k"] = ModelSpec{Model: "kimi"} // opted out of effort digits
 	cfg.Bases["ollama"] = Profile{Flags: []string{"--bare"}}
 	cfg.Profiles["gem"] = Profile{Model: "gemma4:12b", Extends: "ollama"}
 	cfg.Profiles["work"] = Profile{Env: map[string]string{"A": "1"}}
@@ -348,8 +351,11 @@ func TestListViewSectionsAndOrder(t *testing.T) {
 	if !strings.Contains(lines[models], "letter alone = model, +digit 1-5 = effort low..max") {
 		t.Errorf("MODELS header missing legend: %q", lines[models])
 	}
-	if l := lineWith(t, lines, "haiku"); !strings.Contains(l, "no effort digits") {
-		t.Errorf("h row missing efforts note: %q", l)
+	if l := lineWith(t, lines, "kimi"); !strings.Contains(l, "no effort digits") {
+		t.Errorf("k row missing efforts note: %q", l)
+	}
+	if l := lineWith(t, lines, "haiku"); strings.Contains(l, "no effort digits") {
+		t.Errorf("h row has an efforts note: %q", l)
 	}
 	if l := lineWith(t, lines, "gem"); !strings.Contains(l, "gemma4:12b") {
 		t.Errorf("gem row = %q", l)
@@ -398,8 +404,8 @@ func TestFooterLine(t *testing.T) {
 	vc := plainListVC(t, cfg)
 	delete(vc.globalTokens, "gma")
 
-	// 19 global grammar tokens, none linked.
-	if got := footerLine(vc); got != "0 of 19 commands linked in "+contractHome(vc.dir)+" — run clau link · 1 project-only · details: clau show <token>" {
+	// 24 global grammar tokens, none linked.
+	if got := footerLine(vc); got != "0 of 24 commands linked in "+contractHome(vc.dir)+" — run clau link · 1 project-only · details: clau show <token>" {
 		t.Errorf("unlinked footer = %q", got)
 	}
 
@@ -408,7 +414,7 @@ func TestFooterLine(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := footerLine(vc); got != "all 19 commands linked in "+contractHome(vc.dir)+" · 1 project-only · details: clau show <token>" {
+	if got := footerLine(vc); got != "all 24 commands linked in "+contractHome(vc.dir)+" · 1 project-only · details: clau show <token>" {
 		t.Errorf("linked footer = %q", got)
 	}
 }
@@ -448,6 +454,7 @@ func TestMaskedEnvName(t *testing.T) {
 func showVC(t *testing.T) viewContext {
 	t.Helper()
 	cfg := defaultConfig()
+	cfg.Models["k"] = ModelSpec{Model: "kimi"} // opted out of effort digits
 	cfg.Bases["ollama"] = Profile{Flags: []string{"--bare"}}
 	cfg.Profiles["gem"] = Profile{
 		Model: "gemma4:12b", Extends: "ollama",
@@ -488,7 +495,8 @@ func TestShowViewKinds(t *testing.T) {
 	vc := showVC(t)
 	cases := map[string]string{
 		"o":  "model letter: opus · effort digits 1-5",
-		"h":  "model letter: haiku · no effort digits",
+		"h":  "model letter: haiku · effort digits 1-5",
+		"k":  "model letter: kimi · no effort digits",
 		"o3": "grammar: o (opus) + 3 (effort high)",
 	}
 	for token, want := range cases {
@@ -524,8 +532,8 @@ func TestShowViewFallbacksAndErrors(t *testing.T) {
 		t.Errorf("did-you-mean missing: %v", err)
 	}
 
-	if _, err := showView(vc, "h3"); err == nil ||
-		!strings.Contains(err.Error(), "supports no effort levels") {
+	if _, err := showView(vc, "k3"); err == nil ||
+		!strings.Contains(err.Error(), `efforts = false is set for "k" in [models]`) {
 		t.Errorf("resolver error must surface: %v", err)
 	}
 }
