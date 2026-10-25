@@ -440,8 +440,15 @@ func cmdList(args []string) {
 func cmdShow(args []string) {
 	fs := flag.NewFlagSet("show", flag.ExitOnError)
 	dir := fs.String("dir", defaultLinkDir(), "directory checked for links")
+	// flag stops at the first non-flag, so set each token aside and keep
+	// parsing: --dir then works on either side of the token.
 	fs.Parse(args)
-	if fs.NArg() != 1 {
+	var tokens []string
+	for fs.NArg() > 0 {
+		tokens = append(tokens, fs.Arg(0))
+		fs.Parse(fs.Args()[1:])
+	}
+	if len(tokens) != 1 {
 		fatal("usage: clau show <token> [--dir DIR]")
 	}
 	cwd, err := os.Getwd()
@@ -452,7 +459,7 @@ func cmdShow(args []string) {
 	if err != nil {
 		fatal("%v", err)
 	}
-	lines, err := showView(newViewContext(cfg, st, *dir), fs.Arg(0))
+	lines, err := showView(newViewContext(cfg, st, *dir), tokens[0])
 	if err != nil {
 		fatal("%v", err)
 	}
