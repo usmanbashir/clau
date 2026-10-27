@@ -66,16 +66,35 @@ func padCell(s string, w int) string {
 }
 
 // contractHome shortens a path under the user's home to ~/... for display.
+// The raw strings are compared first, then both sides with symlinks
+// resolved, so a home reached through a different symlinked path still
+// contracts. A path that does not exist yet (the link dir before the
+// first clau link) cannot be resolved and keeps the raw comparison.
 func contractHome(p string) string {
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
 		return p
 	}
-	if p == home {
-		return "~"
+	if rel, ok := tildeRel(p, home); ok {
+		return rel
 	}
-	if strings.HasPrefix(p, home+string(filepath.Separator)) {
-		return "~" + p[len(home):]
+	rp, errP := filepath.EvalSymlinks(p)
+	rh, errH := filepath.EvalSymlinks(home)
+	if errP == nil && errH == nil {
+		if rel, ok := tildeRel(rp, rh); ok {
+			return rel
+		}
 	}
 	return p
+}
+
+// tildeRel rewrites p as ~ or ~/... when it is home or inside it.
+func tildeRel(p, home string) (string, bool) {
+	if p == home {
+		return "~", true
+	}
+	if strings.HasPrefix(p, home+string(filepath.Separator)) {
+		return "~" + p[len(home):], true
+	}
+	return "", false
 }

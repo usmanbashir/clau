@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -66,7 +67,45 @@ func TestContractHome(t *testing.T) {
 	if got := contractHome(filepath.Join(home, ".local", "bin")); got != filepath.Join("~", ".local", "bin") {
 		t.Errorf("contractHome = %q", got)
 	}
+	if got := contractHome(home); got != "~" {
+		t.Errorf("home itself = %q, want ~", got)
+	}
 	if got := contractHome("/opt/x"); got != "/opt/x" {
 		t.Errorf("non-home path must pass through: %q", got)
+	}
+}
+
+// TestContractHomeThroughSymlink covers a home reached via a different
+// symlinked path, in both directions. On macOS t.TempDir() already sits
+// under the /var → /private/var link, so even the raw strings differ.
+func TestContractHomeThroughSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges and UserHomeDir reads USERPROFILE")
+	}
+	home := t.TempDir()
+	bin := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(home, alias); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join("~", ".local", "bin")
+
+	t.Setenv("HOME", home)
+	if got := contractHome(filepath.Join(alias, ".local", "bin")); got != want {
+		t.Errorf("path via alias, HOME real: %q, want %q", got, want)
+	}
+	t.Setenv("HOME", alias)
+	if got := contractHome(bin); got != want {
+		t.Errorf("real path, HOME via alias: %q, want %q", got, want)
+	}
+	if got := contractHome(alias); got != "~" {
+		t.Errorf("alias itself with HOME via alias: %q, want ~", got)
+	}
+	// Outside home stays untouched even when it does not exist.
+	if p := filepath.Join(t.TempDir(), "nope"); contractHome(p) != p {
+		t.Errorf("non-home path must pass through: %q", contractHome(p))
 	}
 }
