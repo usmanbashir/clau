@@ -348,6 +348,34 @@ func TestFamilyStates(t *testing.T) {
 	}
 }
 
+// A profile named like a grammar token owns its command (it wins
+// resolution), so a missing one warns on the profile row only, whether
+// the name shadows a ladder digit (o5) or sits outside the ladder (o7).
+func TestFamilyStatesSkipsProfiles(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Profiles["o5"] = Profile{Model: "opus"}
+	cfg.Profiles["o7"] = Profile{Model: "opus"}
+	vc := plainListVC(t, cfg)
+	for _, tok := range []string{"o", "o1", "o2", "o3", "o4"} {
+		if err := os.Symlink(vc.clauPath, filepath.Join(vc.dir, "c"+tok)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	linkable, linked := familyStates("o", vc)
+	if !linkable || !linked {
+		t.Errorf("o family with co5/co7 owned by profiles: linkable=%v linked=%v, want true true", linkable, linked)
+	}
+	lines := listView(vc)
+	if l := lineWith(t, lines, "  o  opus"); strings.Contains(l, "not linked") {
+		t.Errorf("model row warns about a profile's command: %q", l)
+	}
+	for _, name := range []string{"o5", "o7"} {
+		if l := lineWith(t, lines, "  "+name+"  opus"); !strings.Contains(l, "not linked — run clau link") {
+			t.Errorf("%s profile row must warn: %q", name, l)
+		}
+	}
+}
+
 // plainListVC builds a no-color viewContext over cfg with nothing linked.
 func plainListVC(t *testing.T, cfg Config) viewContext {
 	t.Helper()
