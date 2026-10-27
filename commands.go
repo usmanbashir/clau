@@ -21,7 +21,8 @@ func sortedKeys[V any](m map[string]V) []string {
 }
 
 // digitSpan renders sorted ladder digits compactly: "1-5" when
-// contiguous, else "1,3,7".
+// contiguous, else "1,3,7". The byte arithmetic relies on every key
+// being a single digit, which effortKeyRe in config.go enforces.
 func digitSpan(digits []string) string {
 	contiguous := len(digits) > 1
 	for i := 1; i < len(digits); i++ {
