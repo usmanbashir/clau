@@ -102,38 +102,49 @@ func TestStarterConfigIsValidAndInert(t *testing.T) {
 }
 
 func TestTokenSource(t *testing.T) {
-	projModels := map[string]bool{"g": true}
-	projProfiles := map[string]bool{"rev": true}
+	cfg := defaultConfig()
+	cfg.Profiles["rev"] = Profile{Model: "opus"}
+	cfg.Profiles["v2"] = Profile{Model: "opus"}   // global profile ending in a digit
+	cfg.Profiles["g3"] = Profile{Model: "sonnet"} // global profile shaped like a project letter's grammar
+	vc := viewContext{cfg: cfg,
+		projModels:   map[string]bool{"g": true},
+		projProfiles: map[string]bool{"rev": true},
+	}
 	cases := map[string]string{
 		"rev": "project", // declared profile, even if it shadows a global one
 		"g":   "project", // project model letter
 		"g5":  "project", // grammar token of a project model
+		"g3":  "global",  // a profile beats the grammar, and this one is not the project's
+		"v2":  "global",
 		"o5":  "global",
 		"s":   "global",
 	}
 	for token, want := range cases {
-		if got := tokenSource(token, projModels, projProfiles, false); got != want {
+		if got := vc.tokenSource(token); got != want {
 			t.Errorf("tokenSource(%q) = %q, want %q", token, got, want)
 		}
 	}
-	if got := tokenSource("rev", nil, nil, false); got != "global" {
+	if got := (viewContext{cfg: cfg}).tokenSource("rev"); got != "global" {
 		t.Errorf("nil maps must mean global, got %q", got)
 	}
 
 	// A project [efforts] replaces the whole ladder, so every digit token
 	// is project-sourced then, even a digit the global ladder also had;
-	// bare letters keep their own provenance.
+	// bare letters and global profiles keep their own provenance.
+	vc.projEfforts = true
 	ladder := map[string]string{
 		"o6":  "project",
 		"o5":  "project", // remapped, not inherited
 		"g5":  "project",
+		"g3":  "global",
+		"v2":  "global",
 		"o":   "global",
 		"s":   "global",
 		"g":   "project",
 		"rev": "project",
 	}
 	for token, want := range ladder {
-		if got := tokenSource(token, projModels, projProfiles, true); got != want {
+		if got := vc.tokenSource(token); got != want {
 			t.Errorf("tokenSource(%q, efforts) = %q, want %q", token, got, want)
 		}
 	}
@@ -669,5 +680,13 @@ func TestShowViewProjectLadderSource(t *testing.T) {
 	}
 	if out := strings.Join(lines, "\n"); !strings.Contains(out, "source    global (") {
 		t.Errorf("bare global letter must stay global-sourced:\n%s", out)
+	}
+	vc.cfg.Profiles["v2"] = Profile{Model: "opus"}
+	lines, err = showView(vc, "v2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out := strings.Join(lines, "\n"); !strings.Contains(out, "source    global (") {
+		t.Errorf("global profile ending in a digit must stay global-sourced:\n%s", out)
 	}
 }
