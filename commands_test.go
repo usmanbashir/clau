@@ -549,7 +549,7 @@ func TestShowViewProfile(t *testing.T) {
 		"gem → cgem",
 		"kind      profile · extends base: ollama",
 		"source    global (" + contractHome("/g/config.toml") + ")",
-		"linked    no",
+		"linked    no — run clau link", // global token: link can fix it
 		"launches  claude --model gemma4:12b --bare --strict-mcp-config",
 		"ANTHROPIC_AUTH_TOKEN=•••",
 		"ANTHROPIC_BASE_URL=http://localhost:11434",
