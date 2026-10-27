@@ -158,19 +158,21 @@ func loadEffectiveConfig(cwd string, enforce bool) (Config, ProjectStatus, error
 }
 
 // projectDeclarations reports which model keys and profile names the
-// project file itself declares, for provenance display. The file has
-// already been validated by the time this is called.
-func projectDeclarations(path string) (map[string]bool, map[string]bool, error) {
+// project file itself declares, and whether it declares a non-empty
+// [efforts] table (which replaces the whole ladder, see applyConfigFile),
+// for provenance display. The file has already been validated by the
+// time this is called.
+func projectDeclarations(path string) (models, profiles map[string]bool, efforts bool, err error) {
 	var raw rawConfig
-	if _, err := toml.DecodeFile(path, &raw); err != nil {
-		return nil, nil, err
+	if _, err = toml.DecodeFile(path, &raw); err != nil {
+		return nil, nil, false, err
 	}
-	models, profiles := map[string]bool{}, map[string]bool{}
+	models, profiles = map[string]bool{}, map[string]bool{}
 	for k := range raw.Models {
 		models[k] = true
 	}
 	for k := range raw.Profiles {
 		profiles[k] = true
 	}
-	return models, profiles, nil
+	return models, profiles, len(raw.Efforts) > 0, nil
 }

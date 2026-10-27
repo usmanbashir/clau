@@ -112,12 +112,30 @@ func TestTokenSource(t *testing.T) {
 		"s":   "global",
 	}
 	for token, want := range cases {
-		if got := tokenSource(token, projModels, projProfiles); got != want {
+		if got := tokenSource(token, projModels, projProfiles, false); got != want {
 			t.Errorf("tokenSource(%q) = %q, want %q", token, got, want)
 		}
 	}
-	if got := tokenSource("rev", nil, nil); got != "global" {
+	if got := tokenSource("rev", nil, nil, false); got != "global" {
 		t.Errorf("nil maps must mean global, got %q", got)
+	}
+
+	// A project [efforts] replaces the whole ladder, so every digit token
+	// is project-sourced then, even a digit the global ladder also had;
+	// bare letters keep their own provenance.
+	ladder := map[string]string{
+		"o6":  "project",
+		"o5":  "project", // remapped, not inherited
+		"g5":  "project",
+		"o":   "global",
+		"s":   "global",
+		"g":   "project",
+		"rev": "project",
+	}
+	for token, want := range ladder {
+		if got := tokenSource(token, projModels, projProfiles, true); got != want {
+			t.Errorf("tokenSource(%q, efforts) = %q, want %q", token, got, want)
+		}
 	}
 }
 
@@ -595,5 +613,26 @@ func TestShowViewProjectSourceAndLinked(t *testing.T) {
 	}
 	if out := strings.Join(lines, "\n"); !strings.Contains(out, "linked    yes → ") {
 		t.Errorf("linked-yes line missing:\n%s", out)
+	}
+}
+
+func TestShowViewProjectLadderSource(t *testing.T) {
+	vc := showVC(t)
+	vc.cfg.Efforts = map[string]string{"6": "max"}
+	vc.st = ProjectStatus{Path: "/repo/.clau.toml", Trusted: true, Applied: true}
+	vc.projEfforts = true
+	lines, err := showView(vc, "o6")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out := strings.Join(lines, "\n"); !strings.Contains(out, "source    project (/repo/.clau.toml)") {
+		t.Errorf("project-ladder digit token must be project-sourced:\n%s", out)
+	}
+	lines, err = showView(vc, "o")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out := strings.Join(lines, "\n"); !strings.Contains(out, "source    global (") {
+		t.Errorf("bare global letter must stay global-sourced:\n%s", out)
 	}
 }
