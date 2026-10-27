@@ -239,7 +239,7 @@ func TestProjectDeclarations(t *testing.T) {
 	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	models, profiles, err := projectDeclarations(p)
+	models, profiles, efforts, err := projectDeclarations(p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,5 +248,29 @@ func TestProjectDeclarations(t *testing.T) {
 	}
 	if !profiles["deploy"] || len(profiles) != 1 {
 		t.Errorf("profiles = %v", profiles)
+	}
+	if efforts {
+		t.Error("no [efforts] table, but efforts reported as declared")
+	}
+}
+
+func TestProjectDeclarationsEfforts(t *testing.T) {
+	p := filepath.Join(t.TempDir(), ".clau.toml")
+	if err := os.WriteFile(p, []byte("[efforts]\n6 = \"max\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, efforts, err := projectDeclarations(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !efforts {
+		t.Error("[efforts] table not reported as declared")
+	}
+	// An empty table is inert (applyConfigFile keeps the global ladder).
+	if err := os.WriteFile(p, []byte("[efforts]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, efforts, err = projectDeclarations(p); err != nil || efforts {
+		t.Errorf("empty [efforts]: efforts=%v err=%v, want false nil", efforts, err)
 	}
 }

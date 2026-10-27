@@ -75,17 +75,21 @@ func tokensOf(cfg Config) []string {
 }
 
 // tokenSource reports where a token's effective definition comes from:
-// "project" for profiles the project file declares and for grammar
-// tokens of project-declared model letters, else "global".
-func tokenSource(token string, projModels, projProfiles map[string]bool) string {
+// "project" for profiles the project file declares, for grammar tokens
+// of project-declared model letters, and for every digit token when the
+// project declares [efforts] (it replaces the whole ladder, so even a
+// digit the global ladder also had is the project's), else "global".
+func tokenSource(token string, projModels, projProfiles map[string]bool, projEfforts bool) string {
 	if projProfiles[token] {
 		return "project"
 	}
 	letters := token
+	digit := false
 	if last := token[len(token)-1]; last >= '0' && last <= '9' {
 		letters = token[:len(token)-1]
+		digit = true
 	}
-	if projModels[letters] {
+	if projModels[letters] || (digit && projEfforts) {
 		return "project"
 	}
 	return "global"
@@ -103,6 +107,7 @@ type viewContext struct {
 	projModels   map[string]bool // model letters the project file declares
 	projProfiles map[string]bool // profile names the project file declares
 	globalTokens map[string]bool // tokens `clau link` would create (global set)
+	projEfforts  bool            // the project file declares a non-empty [efforts]
 	pal          palette
 }
 
@@ -382,7 +387,7 @@ func showView(vc viewContext, arg string) ([]string, error) {
 	out = append(out, row("kind", kindLine(vc, token)))
 
 	src := "global (" + contractHome(vc.globalPath) + ")"
-	if tokenSource(token, vc.projModels, vc.projProfiles) == "project" {
+	if tokenSource(token, vc.projModels, vc.projProfiles, vc.projEfforts) == "project" {
 		src = "project (" + vc.st.Path + ")"
 	}
 	out = append(out, row("source", src))
@@ -488,7 +493,7 @@ func newViewContext(cfg Config, st ProjectStatus, dir string) viewContext {
 		if g, err := loadConfig(configPath()); err == nil {
 			globalCfg = g
 		}
-		vc.projModels, vc.projProfiles, _ = projectDeclarations(st.Path)
+		vc.projModels, vc.projProfiles, vc.projEfforts, _ = projectDeclarations(st.Path)
 	}
 	vc.globalTokens = map[string]bool{}
 	for _, t := range tokensOf(globalCfg) {
@@ -668,7 +673,7 @@ func projectFindings(st ProjectStatus, store map[string]string, corrupt bool) []
 		fs = append(fs, finding{"ok", "no project config in effect"})
 	case st.Applied:
 		fs = append(fs, finding{"ok", fmt.Sprintf("project config %s trusted and applied", st.Path)})
-		if models, profiles, err := projectDeclarations(st.Path); err == nil {
+		if models, profiles, _, err := projectDeclarations(st.Path); err == nil {
 			var parts []string
 			if len(models) > 0 {
 				keys := make([]string, 0, len(models))
