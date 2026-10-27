@@ -507,7 +507,11 @@ func TestMaskedEnvName(t *testing.T) {
 		"MY_SECRET":                      true,
 		"DB_PASSWORD":                    true,
 		"anthropic_auth_token":           true,
+		"TOKEN_EXPIRY":                   true,  // the segment can sit anywhere
 		"CLAUDE_CODE_MAX_CONTEXT_TOKENS": false, // segment is TOKENS, not TOKEN
+		"KEYS":                           false,
+		"SECRETS":                        false,
+		"PASSWORDS":                      false,
 		"ANTHROPIC_BASE_URL":             false,
 		"MONKEYS":                        false,
 	}
