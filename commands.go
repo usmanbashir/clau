@@ -151,16 +151,18 @@ func profileCell(p Profile, pal palette) string {
 }
 
 // familyStates aggregates link state over a model letter's grammar
-// family (the letter plus its effort digits): linkable when any family
-// token is in the global set, linked when every family command exists.
-// The digits come from the effective ladder, so a project [efforts]
-// replacement leaves the badge conservative: it can warn about family
-// commands the global-only `clau link` will never create.
-func familyStates(letter string, spec ModelSpec, vc viewContext) (linkable, linked bool) {
+// family as `clau link` manages it: the letter plus the digit tokens in
+// the global set. Linkable when any of those is global, linked when
+// every one has its command. The effective ladder is deliberately not
+// consulted: link is global-only, so under a project [efforts]
+// replacement it would warn forever about commands link never creates
+// while missing the global ones it prunes. A project-only digit token
+// shows up in the footer count and in `clau show`, not on the row.
+func familyStates(letter string, vc viewContext) (linkable, linked bool) {
 	toks := []string{letter}
-	if spec.Efforts {
-		for _, d := range sortedKeys(vc.cfg.Efforts) {
-			toks = append(toks, letter+d)
+	for d := '1'; d <= '9'; d++ {
+		if t := letter + string(d); vc.globalTokens[t] {
+			toks = append(toks, t)
 		}
 	}
 	linked = true
@@ -199,17 +201,20 @@ func renderSection(header string, rows []listRowV, pal palette) []string {
 	return lines
 }
 
-// footerLine summarizes link health: linkable commands are the global
-// token set (what `clau link` manages); the rest are project-only.
+// footerLine summarizes link health: linkable commands are the whole
+// global token set (what `clau link` creates and prunes, whether or not
+// the project layer still exposes them); effective tokens outside that
+// set are project-only.
 func footerLine(vc viewContext) string {
 	linkable, linked, projectOnly := 0, 0, 0
+	for t := range vc.globalTokens {
+		linkable++
+		if vc.linked(t) {
+			linked++
+		}
+	}
 	for _, t := range tokensOf(vc.cfg) {
-		if vc.globalTokens[t] {
-			linkable++
-			if vc.linked(t) {
-				linked++
-			}
-		} else {
+		if !vc.globalTokens[t] {
 			projectOnly++
 		}
 	}
@@ -246,7 +251,7 @@ func listView(vc viewContext) []string {
 	var mrows []listRowV
 	for _, letter := range sortedKeys(vc.cfg.Models) {
 		spec := vc.cfg.Models[letter]
-		linkable, linked := familyStates(letter, spec, vc)
+		linkable, linked := familyStates(letter, vc)
 		note := ""
 		if !spec.Efforts {
 			note = pal.dim + "no effort digits" + pal.reset

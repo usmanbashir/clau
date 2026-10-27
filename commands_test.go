@@ -257,7 +257,7 @@ func TestFamilyStates(t *testing.T) {
 	}
 
 	// Nothing linked yet: linkable but not linked.
-	linkable, linked := familyStates("o", cfg.Models["o"], vc)
+	linkable, linked := familyStates("o", vc)
 	if !linkable || linked {
 		t.Errorf("unlinked family: linkable=%v linked=%v, want true false", linkable, linked)
 	}
@@ -268,7 +268,7 @@ func TestFamilyStates(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	linkable, linked = familyStates("o", cfg.Models["o"], vc)
+	linkable, linked = familyStates("o", vc)
 	if !linkable || !linked {
 		t.Errorf("linked family: linkable=%v linked=%v, want true true", linkable, linked)
 	}
@@ -276,11 +276,28 @@ func TestFamilyStates(t *testing.T) {
 	// A project-declared letter is not linkable and not linked.
 	vc2 := vc
 	vc2.globalTokens = map[string]bool{}
-	linkable, linked = familyStates("o", cfg.Models["o"], vc2)
+	linkable, linked = familyStates("o", vc2)
 	if linkable {
 		t.Errorf("project family must not be linkable")
 	}
 	_ = linked // linked=true here (symlinks exist) is acceptable: badge shows nothing extra
+
+	// A project [efforts] ladder replaces the effective digits, but the
+	// family clau link manages is still co, co1..co5: all present means
+	// nothing to warn about, and a missing one is still a warning.
+	vc3 := vc
+	vc3.cfg.Efforts = map[string]string{"6": "max"}
+	linkable, linked = familyStates("o", vc3)
+	if !linkable || !linked {
+		t.Errorf("project ladder, global family linked: linkable=%v linked=%v, want true true", linkable, linked)
+	}
+	if err := os.Remove(filepath.Join(dir, "co5")); err != nil {
+		t.Fatal(err)
+	}
+	linkable, linked = familyStates("o", vc3)
+	if !linkable || linked {
+		t.Errorf("project ladder, co5 missing: linkable=%v linked=%v, want true false", linkable, linked)
+	}
 }
 
 // plainListVC builds a no-color viewContext over cfg with nothing linked.
@@ -416,6 +433,20 @@ func TestFooterLine(t *testing.T) {
 	}
 	if got := footerLine(vc); got != "all 24 commands linked in "+contractHome(vc.dir)+" · 1 project-only · details: clau show <token>" {
 		t.Errorf("linked footer = %q", got)
+	}
+
+	// A project [efforts] ladder (digit 6 only) swaps the effective
+	// digits, but the denominator stays the 24 commands clau link
+	// manages; f6 h6 o6 s6 join gma as project-only.
+	vc.cfg.Efforts = map[string]string{"6": "max"}
+	if got := footerLine(vc); got != "all 24 commands linked in "+contractHome(vc.dir)+" · 5 project-only · details: clau show <token>" {
+		t.Errorf("project ladder footer = %q", got)
+	}
+	if err := os.Remove(filepath.Join(vc.dir, "co5")); err != nil {
+		t.Fatal(err)
+	}
+	if got := footerLine(vc); got != "23 of 24 commands linked in "+contractHome(vc.dir)+" — run clau link · 5 project-only · details: clau show <token>" {
+		t.Errorf("project ladder footer with co5 missing = %q", got)
 	}
 }
 
