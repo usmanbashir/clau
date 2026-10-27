@@ -75,27 +75,6 @@ func tokensOf(cfg Config) []string {
 	return tokens
 }
 
-// tokenSource reports where a token's effective definition comes from:
-// "project" for profiles the project file declares, for grammar tokens
-// of project-declared model letters, and for every digit token when the
-// project declares [efforts] (it replaces the whole ladder, so even a
-// digit the global ladder also had is the project's), else "global".
-func tokenSource(token string, projModels, projProfiles map[string]bool, projEfforts bool) string {
-	if projProfiles[token] {
-		return "project"
-	}
-	letters := token
-	digit := false
-	if last := token[len(token)-1]; last >= '0' && last <= '9' {
-		letters = token[:len(token)-1]
-		digit = true
-	}
-	if projModels[letters] || (digit && projEfforts) {
-		return "project"
-	}
-	return "global"
-}
-
 // viewContext carries everything the list and show renderers need,
 // assembled once per command so the renderers stay pure and testable.
 type viewContext struct {
@@ -114,6 +93,33 @@ type viewContext struct {
 
 func (vc viewContext) linked(token string) bool {
 	return isOwned(filepath.Join(vc.dir, linkFileName("c"+token, vc.goos)), vc.clauPath)
+}
+
+// tokenSource reports where a token's effective definition comes from:
+// "project" for profiles the project file declares, for grammar tokens
+// of project-declared model letters, and for every digit token when the
+// project declares [efforts] (it replaces the whole ladder, so even a
+// digit the global ladder also had is the project's), else "global".
+// A profile the project does not declare is global whatever its name
+// looks like: profiles beat the grammar in resolveToken, so the digit
+// rules never apply to one.
+func (vc viewContext) tokenSource(token string) string {
+	if vc.projProfiles[token] {
+		return "project"
+	}
+	if _, ok := vc.cfg.Profiles[token]; ok {
+		return "global"
+	}
+	letters := token
+	digit := false
+	if last := token[len(token)-1]; last >= '0' && last <= '9' {
+		letters = token[:len(token)-1]
+		digit = true
+	}
+	if vc.projModels[letters] || (digit && vc.projEfforts) {
+		return "project"
+	}
+	return "global"
 }
 
 // joinBadges dim-joins non-empty annotation parts with " · ".
@@ -388,7 +394,7 @@ func showView(vc viewContext, arg string) ([]string, error) {
 	out = append(out, row("kind", kindLine(vc, token)))
 
 	src := "global (" + contractHome(vc.globalPath) + ")"
-	if tokenSource(token, vc.projModels, vc.projProfiles, vc.projEfforts) == "project" {
+	if vc.tokenSource(token) == "project" {
 		src = "project (" + vc.st.Path + ")"
 	}
 	out = append(out, row("source", src))
