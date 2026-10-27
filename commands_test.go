@@ -294,14 +294,30 @@ func TestFamilyStates(t *testing.T) {
 		t.Errorf("linked family: linkable=%v linked=%v, want true true", linkable, linked)
 	}
 
-	// A project-declared letter is not linkable and not linked.
+	// A letter without effort digits is a family of one.
+	cfg.Models["k"] = ModelSpec{Model: "kimi"}
+	vc.globalTokens["k"] = true
+	linkable, linked = familyStates("k", vc)
+	if !linkable || linked {
+		t.Errorf("unlinked k: linkable=%v linked=%v, want true false", linkable, linked)
+	}
+	if err := os.Symlink(clauPath, filepath.Join(dir, "ck")); err != nil {
+		t.Fatal(err)
+	}
+	linkable, linked = familyStates("k", vc)
+	if !linkable || !linked {
+		t.Errorf("linked k: linkable=%v linked=%v, want true true", linkable, linked)
+	}
+
+	// Links that are no longer in the global set (a project-declared
+	// letter, or orphans) are not linkable, but still count as linked:
+	// the badge then shows nothing extra.
 	vc2 := vc
 	vc2.globalTokens = map[string]bool{}
 	linkable, linked = familyStates("o", vc2)
-	if linkable {
-		t.Errorf("project family must not be linkable")
+	if linkable || !linked {
+		t.Errorf("orphaned family: linkable=%v linked=%v, want false true", linkable, linked)
 	}
-	_ = linked // linked=true here (symlinks exist) is acceptable: badge shows nothing extra
 
 	// A project [efforts] ladder replaces the effective digits, but the
 	// family clau link manages is still co, co1..co5: all present means
