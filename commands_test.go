@@ -578,6 +578,18 @@ func TestShowViewKinds(t *testing.T) {
 	}
 }
 
+func TestShowViewPlainProfileKind(t *testing.T) {
+	vc := showVC(t)
+	vc.cfg.Profiles["rev"] = Profile{Model: "opus", Effort: "high"}
+	lines, err := showView(vc, "rev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l := lineWith(t, lines, "kind"); l != "  kind      profile" {
+		t.Errorf("plain profile kind row = %q, want exactly profile", l)
+	}
+}
+
 func TestShowViewFallbacksAndErrors(t *testing.T) {
 	vc := showVC(t)
 
