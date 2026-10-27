@@ -170,10 +170,16 @@ func profileCell(p Profile, pal palette) string {
 // replacement it would warn forever about commands link never creates
 // while missing the global ones it prunes. A project-only digit token
 // shows up in the footer count and in `clau show`, not on the row.
+// A profile named like a digit token (o5, o7) is skipped: it wins
+// resolution, so its command is the profile row's to warn about.
 func familyStates(letter string, vc viewContext) (linkable, linked bool) {
 	toks := []string{letter}
 	for d := '1'; d <= '9'; d++ {
-		if t := letter + string(d); vc.globalTokens[t] {
+		t := letter + string(d)
+		if _, isProfile := vc.cfg.Profiles[t]; isProfile {
+			continue
+		}
+		if vc.globalTokens[t] {
 			toks = append(toks, t)
 		}
 	}
