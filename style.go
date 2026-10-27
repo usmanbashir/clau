@@ -42,6 +42,9 @@ func colorChoice(isTTY bool, goos string, getenv func(string) string) bool {
 	return true
 }
 
+// stdoutIsTTY uses the char-device heuristic deliberately: it also says
+// yes for /dev/null, but nobody can see the escapes sent there, and the
+// alternative is a golang.org/x/term dependency for no visible effect.
 func stdoutIsTTY() bool {
 	fi, err := os.Stdout.Stat()
 	if err != nil {
