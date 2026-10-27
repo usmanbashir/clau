@@ -97,6 +97,23 @@ func TestContractHomeThroughSymlink(t *testing.T) {
 	if got := contractHome(filepath.Join(alias, ".local", "bin")); got != want {
 		t.Errorf("path via alias, HOME real: %q, want %q", got, want)
 	}
+	if got := contractHome(filepath.Join(alias, ".local", "bin") + string(filepath.Separator)); got != want {
+		t.Errorf("trailing separator via alias: %q, want %q", got, want)
+	}
+	// The leaf is the thing being named: a link file must not turn into
+	// its target (co5 → ~/bin/clau) when the parent is resolved.
+	if err := os.MkdirAll(filepath.Join(home, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "bin", "clau"), nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(home, "bin", "clau"), filepath.Join(bin, "co5")); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := contractHome(filepath.Join(alias, ".local", "bin", "co5")), filepath.Join(want, "co5"); got != want {
+		t.Errorf("link file via alias: %q, want %q", got, want)
+	}
 	t.Setenv("HOME", alias)
 	if got := contractHome(bin); got != want {
 		t.Errorf("real path, HOME via alias: %q, want %q", got, want)

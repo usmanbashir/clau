@@ -69,10 +69,13 @@ func padCell(s string, w int) string {
 }
 
 // contractHome shortens a path under the user's home to ~/... for display.
-// The raw strings are compared first, then both sides with symlinks
-// resolved, so a home reached through a different symlinked path still
-// contracts. A path that does not exist yet (the link dir before the
-// first clau link) cannot be resolved and keeps the raw comparison.
+// The raw strings are compared first, then the path's parent and home
+// with symlinks resolved, so a home reached through a different
+// symlinked path still contracts. Only the parent is resolved: the leaf
+// is the thing being named, and a link file (co5 → clau) must not turn
+// into its target. A parent that does not exist yet (the link dir
+// before the first clau link) cannot be resolved and keeps the raw
+// comparison.
 func contractHome(p string) string {
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
@@ -81,10 +84,11 @@ func contractHome(p string) string {
 	if rel, ok := tildeRel(p, home); ok {
 		return rel
 	}
-	rp, errP := filepath.EvalSymlinks(p)
+	clean := filepath.Clean(p)
+	rd, errD := filepath.EvalSymlinks(filepath.Dir(clean))
 	rh, errH := filepath.EvalSymlinks(home)
-	if errP == nil && errH == nil {
-		if rel, ok := tildeRel(rp, rh); ok {
+	if errD == nil && errH == nil {
+		if rel, ok := tildeRel(filepath.Join(rd, filepath.Base(clean)), rh); ok {
 			return rel
 		}
 	}
