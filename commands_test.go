@@ -240,7 +240,10 @@ func TestRowBadges(t *testing.T) {
 	}{
 		{"linked global", false, true, true, ""},
 		{"unlinked global", false, true, false, "not linked — run clau link"},
+		{"orphaned link", false, false, true, ""}, // linked, but no longer in the global set
 		{"project linked", true, true, true, "project"},
+		{"project unlinked global", true, true, false, "project · not linked — run clau link"},
+		{"project orphaned link", true, false, true, "project"},
 		{"project only unlinked", true, false, false, "project · c gma"},
 		{"unlinkable unlinked", false, false, false, "c gma"},
 	}
