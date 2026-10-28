@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>clau social card</title>
+<!--
+  Source for clau's GitHub social preview and its share animation.
+  Edit TAGLINE and ROWS in the script below, then run export.py to
+  regenerate social-preview.png, board.mp4 and board.gif. Open this
+  file in a browser to watch the flip; click the board to replay it.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+html, body { margin: 0; background: #000; }
+svg { display: block; }
+#board { cursor: pointer; }
+.fc { font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; }
+</style>
+</head>
+<body>
+<svg id="board" width="1280" height="640" viewBox="0 0 1280 640" role="img">
+  <defs>
+    <linearGradient id="flap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#303030"/>
+      <stop offset=".5" stop-color="#272727"/>
+      <stop offset=".5" stop-color="#1C1C1C"/>
+      <stop offset="1" stop-color="#222"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="#000"/>
+  <rect width="1280" height="116" fill="#FFD400"/>
+  <text class="fc" x="64" y="88" fill="#000"><tspan font-size="88" font-weight="700">clau</tspan><tspan id="tagline" dx="28" font-size="36" font-weight="500"></tspan></text>
+  <g class="fc" font-size="22" font-weight="500" fill="#8C8C8C">
+    <text x="64" y="178">shortcut</text>
+    <text x="311" y="178">model</text>
+    <text x="603" y="178">effort</text>
+    <text x="805" y="178">note</text>
+  </g>
+  <g id="tiles"></g>
+  <text class="fc" x="64" y="602" font-size="24" font-weight="500" fill="#8C8C8C">usmanbashir/clau</text>
+  <text class="fc" x="1206" y="602" font-size="24" font-weight="500" fill="#FFD400" text-anchor="end">unknown shortcut? it passes straight through to claude</text>
+</svg>
+<script>
+const TAGLINE = 'skip the flags and the /model picker';
+// One board row each: shortcut, model, effort, note.
+const ROWS = [
+  ['co5', 'opus', 'max', ''],
+  ['cs1', 'sonnet', 'low', ''],
+  ['crev', 'opus', 'high', 'reviewer'],
+  ['cqw38', 'qwen', '', 'ollama'],
+];
+const COLS = [64, 311, 603, 805];   // left edge of each column
+const WIDTHS = [5, 6, 4, 9];        // tiles per column
+const PITCH = 45, TILE = 41, ROW_TOP = 196, ROW_PITCH = 92;
+const TICK = 60;                    // ms between letter changes on a flipping tile
+const POOL = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+const board = document.getElementById('board');
+const tiles = document.getElementById('tiles');
+document.getElementById('tagline').textContent = TAGLINE;
+board.setAttribute('aria-label', `clau: ${TAGLINE}. ` +
+  ROWS.map(r => r.filter(Boolean).join(' ')).join(', '));
+
+// Integer hash in place of Math.random, so the same time always draws
+// the same frame and export.py can capture the flip frame by frame.
+function hash(a, b) {
+  let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x632be5ab, 0xc2b2ae35);
+  h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12;
+  return h >>> 0;
+}
+
+const flaps = [];
+ROWS.forEach((row, r) => row.forEach((word, c) => {
+  for (let k = 0; k < WIDTHS[c]; k++) {
+    const x = COLS[c] + k * PITCH, y = ROW_TOP + r * ROW_PITCH, ch = (word[k] || '').trim();
+    tiles.insertAdjacentHTML('beforeend',
+      `<g><rect x="${x}" y="${y}" width="${TILE}" height="70" rx="4" fill="url(#flap)"/>` +
+      `<text class="fc" x="${x + TILE / 2}" y="${y + 49}" font-size="54" font-weight="600" fill="#F4F4F0" text-anchor="middle">${ch}</text>` +
+      `<path d="M${x} ${y + 35}h${TILE}" stroke="#000" stroke-width="2"/></g>`);
+    if (ch) flaps.push({ el: tiles.lastElementChild.querySelector('text'), ch, r, c, k });
+  }
+}));
+// Tiles settle top to bottom and left to right, with a little jitter.
+flaps.forEach((f, i) => f.until = 250 + f.r * 110 + f.c * 120 + f.k * 45 + hash(i, 7) % 140);
+const DURATION = Math.max(...flaps.map(f => f.until));
+
+function render(t) {
+  const step = Math.floor(t / TICK);
+  flaps.forEach((f, i) => f.el.textContent = t < f.until ? POOL[hash(i, step) % POOL.length] : f.ch);
+}
+
+let raf;
+function play() {
+  cancelAnimationFrame(raf);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return render(DURATION);
+  const t0 = performance.now();
+  const frame = now => {
+    const t = now - t0;
+    render(t);
+    if (t < DURATION) raf = requestAnimationFrame(frame);
+  };
+  raf = requestAnimationFrame(frame);
+}
+
+window.clauBoard = { render, duration: DURATION, tick: TICK };
+board.addEventListener('click', play);
+document.fonts.ready.then(() => {
+  document.body.dataset.ready = '';
+  if (location.hash === '#export') render(DURATION); else play();
+});
+</script>
+</body>
+</html>

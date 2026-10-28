@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>clau</title>
+  <defs>
+    <linearGradient id="flap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#303030"/>
+      <stop offset=".5" stop-color="#272727"/>
+      <stop offset=".5" stop-color="#1C1C1C"/>
+      <stop offset="1" stop-color="#222"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="url(#flap)"/>
+  <!-- "c" from Barlow Condensed SemiBold (OFL), outlined at 62px -->
+  <path fill="#FFD400" transform="translate(18.918 48) scale(.062 -.062)" d="M38 155V357Q38 430 85.5 474.5Q133 519 215 519Q297 519 345.0 475.5Q393 432 393 365V351Q393 346 389.5 342.5Q386 339 381 339L289 335Q277 335 277 347V357Q277 382 259.5 400.5Q242 419 215 419Q188 419 171.0 399.0Q154 379 154 348V163Q154 132 171.0 112.0Q188 92 215 92Q242 92 259.5 110.5Q277 129 277 155V165Q277 170 280.5 173.5Q284 177 289 177L381 176Q386 176 389.5 172.5Q393 169 393 164V146Q393 77 345.0 34.5Q297 -8 215 -8Q133 -8 85.5 36.0Q38 80 38 155Z"/>
+  <path d="M0 32H64" stroke="#000" stroke-width="2.5"/>
+</svg>
