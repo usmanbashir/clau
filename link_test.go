@@ -401,3 +401,74 @@ func TestLinkNamesSkipBases(t *testing.T) {
 		t.Error("profile command cq27 missing")
 	}
 }
+
+// TestDirOnPath covers the plain spellings of a PATH entry. Its parent
+// on PATH doesn't count: the shell looks only in the folder itself.
+func TestDirOnPath(t *testing.T) {
+	dir, other := t.TempDir(), t.TempDir()
+	sep := string(os.PathListSeparator)
+	for _, c := range []struct {
+		name, path string
+		want       bool
+	}{
+		{"exact", other + sep + dir, true},
+		{"trailing separator", dir + string(filepath.Separator), true},
+		{"absent", other, false},
+		{"parent only", filepath.Dir(dir), false},
+	} {
+		t.Setenv("PATH", c.path)
+		if got := dirOnPath(dir); got != c.want {
+			t.Errorf("%s: PATH=%q, dirOnPath = %v, want %v", c.name, c.path, got, c.want)
+		}
+	}
+}
+
+// TestDirOnPathThroughSymlink covers a PATH entry that reaches the link
+// dir by another name, like Fedora Atomic's /home → /var/home, in both
+// directions.
+func TestDirOnPathThroughSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink test")
+	}
+	dir := t.TempDir()
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(dir, alias); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", alias)
+	if !dirOnPath(dir) {
+		t.Errorf("PATH=%s (→ %s): dir must count as on PATH", alias, dir)
+	}
+	t.Setenv("PATH", dir)
+	if !dirOnPath(alias) {
+		t.Errorf("PATH=%s: alias %s must count as on PATH", dir, alias)
+	}
+}
+
+// TestDirOnPathMissingDirComparesStrings covers doctor before the first
+// clau link: the folder doesn't exist yet, so only the spelling can match.
+func TestDirOnPathMissingDirComparesStrings(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "missing", "bin")
+	t.Setenv("PATH", dir+string(filepath.Separator))
+	if !dirOnPath(dir) {
+		t.Errorf("PATH=%s: missing dir must match its own spelling", dir)
+	}
+	t.Setenv("PATH", t.TempDir())
+	if dirOnPath(dir) {
+		t.Errorf("missing dir %s must not match an unrelated PATH", dir)
+	}
+}
+
+// TestDirOnPathWindowsIgnoresCase covers C:\Users\Me vs c:\users\me:
+// Windows paths are case-insensitive, so a PATH entry differing only in
+// case names the same folder.
+func TestDirOnPathWindowsIgnoresCase(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("case-insensitive paths are a Windows guarantee")
+	}
+	dir := t.TempDir()
+	t.Setenv("PATH", strings.ToUpper(dir))
+	if !dirOnPath(dir) {
+		t.Errorf("PATH=%s: %s must count as on PATH", strings.ToUpper(dir), dir)
+	}
+}

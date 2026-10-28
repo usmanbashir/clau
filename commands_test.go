@@ -77,6 +77,30 @@ func TestDoctorFindings(t *testing.T) {
 	}
 }
 
+// TestDoctorLinkDirThroughSymlink guards against a false "not on PATH"
+// warning when PATH reaches the link dir by another name, like Fedora
+// Atomic's /home → /var/home.
+func TestDoctorLinkDirThroughSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink test")
+	}
+	dir := t.TempDir()
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(dir, alias); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", alias)
+	var got []string
+	for _, f := range doctorFindings(defaultConfig(), nil, dir, "/nonexistent/clau", "linux") {
+		if strings.HasPrefix(f.Msg, "link dir ") {
+			got = append(got, f.Level+" "+f.Msg)
+		}
+	}
+	if want := "ok link dir " + dir + " is on PATH"; len(got) != 1 || got[0] != want {
+		t.Errorf("link dir findings = %q, want [%q]", got, want)
+	}
+}
+
 func TestDoctorConfigError(t *testing.T) {
 	fs := doctorFindings(Config{}, errors.New("boom at line 3"), t.TempDir(), "/x/clau", "linux")
 	if len(fs) != 1 || fs[0].Level != "fail" || !strings.Contains(fs[0].Msg, "boom") {

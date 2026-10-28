@@ -227,6 +227,9 @@ func cmdLink(args []string) {
 	}
 	fmt.Printf("linked %d, kept %d, skipped %d, pruned %d in %s\n",
 		len(rep.Created), len(rep.Kept), len(rep.Skipped), len(rep.Pruned), *dir)
+	if !dirOnPath(*dir) {
+		fmt.Fprintf(os.Stderr, "clau: %s is not on PATH, so these commands won't be found; add it to PATH in your shell config (clau doctor re-checks)\n", contractHome(*dir))
+	}
 }
 
 func cmdUnlink(args []string) {
