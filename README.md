@@ -1,4 +1,8 @@
+<img src="docs/brand/logo.svg" width="80" height="80" alt="">
+
 # clau
+
+**Claw back your time.**
 
 [![CI](https://github.com/usmanbashir/clau/actions/workflows/ci.yml/badge.svg)](https://github.com/usmanbashir/clau/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/usmanbashir/clau)](https://github.com/usmanbashir/clau/releases)
