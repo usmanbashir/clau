@@ -12,6 +12,11 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
+    # Setting files replaces the default LICENSE*/README*/CHANGELOG*
+    # globs, which never matched the GPL text in COPYING.
+    files:
+      - README.md
+      - COPYING
 checksum:
   name_template: checksums.txt
 release:
