@@ -625,13 +625,7 @@ func doctorFindings(cfg Config, cfgErr error, dir, clauPath, goos string) []find
 	} else {
 		fs = append(fs, finding{"ok", fmt.Sprintf("exec target %q found", cfg.Claude)})
 	}
-	onPath := false
-	for _, d := range filepath.SplitList(os.Getenv("PATH")) {
-		if d != "" && filepath.Clean(d) == filepath.Clean(dir) {
-			onPath = true
-		}
-	}
-	if !onPath {
+	if !dirOnPath(dir) {
 		fs = append(fs, finding{"warn", fmt.Sprintf("link dir %s is not on PATH", dir)})
 	} else {
 		fs = append(fs, finding{"ok", fmt.Sprintf("link dir %s is on PATH", dir)})

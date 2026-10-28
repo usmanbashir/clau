@@ -574,6 +574,63 @@ func TestIntegrationLinkIgnoresProjectProfiles(t *testing.T) {
 	}
 }
 
+// TestIntegrationLinkHintsWhenDirOffPath guards the README Quick start:
+// `clau link` into a folder the shell can't see must say so on stderr,
+// on every run, while stdout and the exit code stay the same whether or
+// not the folder is on PATH.
+func TestIntegrationLinkHintsWhenDirOffPath(t *testing.T) {
+	bin := buildClau(t)
+	home := t.TempDir()
+	cfgFile := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(cfgFile, []byte(projectGlobal), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	linkDir := filepath.Join(home, ".local", "bin")
+	run := func(path string) (string, string) {
+		t.Helper()
+		cmd := exec.Command(bin, "link")
+		cmd.Dir = t.TempDir()
+		// A temp home puts the default link folder there and lets the
+		// hint show it as ~/.local/bin.
+		cmd.Env = append(os.Environ(),
+			"HOME="+home, "USERPROFILE="+home,
+			"PATH="+path,
+			"CLAU_CONFIG="+cfgFile,
+		)
+		var stdout, stderr strings.Builder
+		cmd.Stdout, cmd.Stderr = &stdout, &stderr
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("link with PATH=%s: %v\nstdout:\n%s\nstderr:\n%s", path, err, stdout.String(), stderr.String())
+		}
+		return stdout.String(), stderr.String()
+	}
+	hint := filepath.Join("~", ".local", "bin") + " is not on PATH"
+
+	offOut, offErr := run(fakeClaudeDir)
+	if !strings.Contains(offErr, hint) {
+		t.Errorf("link dir off PATH: stderr must contain %q, got:\n%s", hint, offErr)
+	}
+	// Nothing new to link this time; the folder is still unreachable.
+	if _, againErr := run(fakeClaudeDir); !strings.Contains(againErr, hint) {
+		t.Errorf("rerun with link dir off PATH: stderr must contain %q, got:\n%s", hint, againErr)
+	}
+
+	// Start over so the on-PATH run links the same set from scratch.
+	if err := os.RemoveAll(linkDir); err != nil {
+		t.Fatal(err)
+	}
+	onOut, onErr := run(linkDir + string(os.PathListSeparator) + fakeClaudeDir)
+	if strings.Contains(onErr, "not on PATH") {
+		t.Errorf("link dir on PATH: stderr must not warn, got:\n%s", onErr)
+	}
+	if onOut != offOut {
+		t.Errorf("stdout must not depend on PATH:\noff PATH: %q\non PATH:  %q", offOut, onOut)
+	}
+	if !strings.HasPrefix(offOut, "linked ") {
+		t.Errorf("stdout must be the link summary, got %q", offOut)
+	}
+}
+
 func TestIntegrationExtendsReachesLaunch(t *testing.T) {
 	bin := buildClau(t)
 	rec := runShortcut(t, bin, "clau", `

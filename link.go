@@ -174,6 +174,28 @@ func foreignInPath(name, linkDir, clauPath, goos string) string {
 	return ""
 }
 
+// dirOnPath reports whether some PATH entry names dir. Entries match by
+// file identity, so a symlinked spelling (/home → /var/home) or a
+// Windows path in another letter case still counts. When either side
+// can't be stat'ed (the link dir before the first clau link), the
+// cleaned paths are compared instead.
+func dirOnPath(dir string) bool {
+	di, derr := os.Stat(dir)
+	for _, d := range filepath.SplitList(os.Getenv("PATH")) {
+		if d == "" {
+			continue
+		}
+		if fi, err := os.Stat(d); err == nil && derr == nil {
+			if os.SameFile(di, fi) {
+				return true
+			}
+		} else if filepath.Clean(d) == filepath.Clean(dir) {
+			return true
+		}
+	}
+	return false
+}
+
 type linkReport struct {
 	Created, Kept, Skipped, Pruned []string
 }
